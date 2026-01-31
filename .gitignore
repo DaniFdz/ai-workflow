@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# MiniDani specific
+todos.db
+*.db
+*.db-journal
+.opencode/opencode.db*
+
+# Git worktrees (generated during execution)
+*_worktree_*/
+
+# Test outputs
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Logs
+*.log
