@@ -68,8 +68,8 @@ echo ""
 # Step 3: Setup OpenCode agents
 echo -e "${BOLD}[3/5] Setting up OpenCode agents...${NC}"
 
-OPENCODE_DIR="$HOME/.opencode"
-AGENTS_SOURCE="$SCRIPT_DIR/.opencode/agents"
+OPENCODE_DIR="$HOME/.config/opencode"
+AGENTS_SOURCE="$SCRIPT_DIR/agents"
 AGENTS_DEST="$OPENCODE_DIR/agents"
 
 # Create .opencode directory if it doesn't exist
@@ -87,7 +87,7 @@ cp -r "$AGENTS_SOURCE" "$AGENTS_DEST"
 
 if [ -d "$AGENTS_DEST" ]; then
     AGENT_COUNT=$(ls -1 "$AGENTS_DEST" | grep -c '\.md$')
-    echo -e "  ${GREEN}✅ Agents installed to ~/.opencode/agents/ ($AGENT_COUNT agents)${NC}"
+    echo -e "  ${GREEN}✅ Agents installed to ~/.config/opencode/agents/ ($AGENT_COUNT agents)${NC}"
     echo -e "  ${BLUE}📝 Available: manager, blue-team, red-team, judge, branch-namer, pr-creator${NC}"
 else
     echo -e "  ${RED}❌ Failed to copy agents${NC}"
@@ -173,7 +173,7 @@ echo -e "${BOLD}With file:${NC}"
 echo "  minidani \"\$(cat prompt.md)\""
 echo ""
 echo -e "${BOLD}OpenCode agents:${NC}"
-echo "  Agents installed to ~/.opencode/agents/"
+echo "  Agents installed to ~/.config/opencode/agents/"
 echo "  Any OpenCode project can use: @manager, @blue-team, @red-team, etc."
 echo "  To update agents, run: ./install.sh again"
 echo ""
