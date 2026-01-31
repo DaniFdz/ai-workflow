@@ -99,22 +99,27 @@ python3 /path/to/minidani.py "$(cat prompt.md)"
 ### Prerequisites
 
 - **Python 3.8+**
-  ```bash
-  python3 --version
-  ```
-
-- **Git**
-  ```bash
-  git --version
-  ```
-
 - **OpenCode CLI** - Install from [OpenCode](https://github.com/unit-mesh/opencode)
-  ```bash
-  # Verify installation
-  opencode --version
-  ```
 
-### Setup
+### Automatic Installation (Recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DaniFdz/ai-workflow/master/install.sh | bash
+```
+
+This will:
+- ✅ Verify Python 3.8+ is installed
+- ✅ Create a virtual environment with dependencies
+- ✅ Install `minidani` command in your PATH
+- ✅ Make it available system-wide
+
+After installation:
+```bash
+cd /path/to/your/project
+minidani "Your task here"
+```
+
+### Manual Installation
 
 1. **Clone the repository**
    ```bash
@@ -122,36 +127,34 @@ python3 /path/to/minidani.py "$(cat prompt.md)"
    cd ai-workflow
    ```
 
-2. **Install Python dependencies**
+2. **Run the installer**
    ```bash
-   pip install -r requirements.txt
+   ./install.sh
    ```
 
-3. **Make script executable** (optional)
+   Or install dependencies manually:
    ```bash
-   chmod +x minidani.py
-   
-   # Add alias to your shell
-   echo 'alias minidani="python3 ~/ai-workflow/minidani.py"' >> ~/.bashrc
-   source ~/.bashrc
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
    ```
 
 ### Verify Installation
 
 ```bash
-# Test Python dependencies
-python3 -c "import rich; print('✅ Rich installed')"
-
 # Test OpenCode
 opencode --version
 
-# Test MiniDani (creates temporary test repo)
+# Test MiniDani command
+minidani --help 2>/dev/null || echo "Run 'minidani' from any directory"
+
+# Test with a simple task (creates temporary test repo)
 cd /tmp
 mkdir test-minidani && cd test-minidani
 git init
 echo "# Test" > README.md
 git add . && git commit -m "init"
-python3 ~/ai-workflow/minidani.py "Create hello.py that prints hello world"
+minidani "Create hello.py that prints hello world"
 ```
 
 [↑ Back to top](#table-of-contents)
