@@ -54,6 +54,10 @@ python3 /path/to/minidani.py "Add OAuth2 authentication with JWT tokens"
 
 ### Architecture
 
+![MiniDani Workflow](assets/workflow-diagram.png)
+
+**6-Phase Process:**
+
 ```
 User Prompt
     ↓
