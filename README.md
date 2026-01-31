@@ -42,13 +42,46 @@ MiniDani creates **competitive pressure** between AI agents to produce better co
 
 ## Quick Start
 
+### Basic Usage
+
 ```bash
 # 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. Run in your project
+# 2. Run in your project with inline prompt
 cd /path/to/your/project
 python3 /path/to/minidani.py "Add OAuth2 authentication with JWT tokens"
+```
+
+### Using a Prompt File
+
+For complex prompts, use a file:
+
+```bash
+# Create a prompt file
+cat > prompt.md << 'EOF'
+Build a REST API with the following features:
+
+- User authentication using JWT tokens
+- CRUD operations for posts (create, read, update, delete)
+- SQLite database with proper migrations
+- Comprehensive test suite using pytest
+- Docker setup with docker-compose
+- API documentation with OpenAPI/Swagger
+- Rate limiting middleware
+- Input validation and error handling
+
+Technical requirements:
+- Python 3.8+
+- FastAPI or Flask
+- SQLAlchemy ORM
+- Follow PEP 8 style guide
+- 80%+ test coverage
+EOF
+
+# Run with file input
+cd /path/to/your/project
+python3 /path/to/minidani.py "$(cat prompt.md)"
 ```
 
 **What happens:**
