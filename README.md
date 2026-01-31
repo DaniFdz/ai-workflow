@@ -26,12 +26,14 @@ MiniDani creates **competitive pressure** between AI agents to produce better co
 ### Requirements
 
 ```bash
-pip install rich
+pip install -r requirements.txt
 ```
 
+**Dependencies:**
 - Python 3.8+
 - Git
 - [OpenCode CLI](https://github.com/unit-mesh/opencode) installed at `~/.opencode/bin/opencode`
+- Rich library (for TUI, auto-installed via requirements.txt)
 
 ### Usage
 

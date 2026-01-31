@@ -303,9 +303,9 @@ cp ~/minidani/.opencode/agents/* ~/.config/opencode/agents/
 ### "ModuleNotFoundError: No module named 'rich'"
 
 ```bash
-pip install rich
+pip install -r requirements.txt
 # o
-pip3 install --user rich
+pip3 install --user rich>=13.7.0
 ```
 
 ### "OpenCode not found"
