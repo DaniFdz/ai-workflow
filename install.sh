@@ -70,28 +70,27 @@ echo -e "${BOLD}[3/5] Setting up OpenCode agents...${NC}"
 
 OPENCODE_DIR="$HOME/.opencode"
 AGENTS_SOURCE="$SCRIPT_DIR/.opencode/agents"
-AGENTS_LINK="$OPENCODE_DIR/agents"
+AGENTS_DEST="$OPENCODE_DIR/agents"
 
 # Create .opencode directory if it doesn't exist
 mkdir -p "$OPENCODE_DIR"
 
-# Remove existing agents link/directory if present
-if [ -L "$AGENTS_LINK" ]; then
-    echo -e "  ${YELLOW}⚠️  Removing existing agents symlink${NC}"
-    rm "$AGENTS_LINK"
-elif [ -d "$AGENTS_LINK" ]; then
-    echo -e "  ${YELLOW}⚠️  Backing up existing agents directory${NC}"
-    mv "$AGENTS_LINK" "${AGENTS_LINK}.backup.$(date +%s)"
+# Backup existing agents directory if present
+if [ -d "$AGENTS_DEST" ]; then
+    BACKUP_PATH="${AGENTS_DEST}.backup.$(date +%s)"
+    echo -e "  ${YELLOW}⚠️  Backing up existing agents to: $(basename $BACKUP_PATH)${NC}"
+    mv "$AGENTS_DEST" "$BACKUP_PATH"
 fi
 
-# Create symlink
-ln -sf "$AGENTS_SOURCE" "$AGENTS_LINK"
+# Copy agents directory
+cp -r "$AGENTS_SOURCE" "$AGENTS_DEST"
 
-if [ -L "$AGENTS_LINK" ] && [ -d "$AGENTS_LINK" ]; then
-    echo -e "  ${GREEN}✅ Agents linked: ~/.opencode/agents/ -> $AGENTS_SOURCE${NC}"
-    echo -e "  ${BLUE}📝 Available agents: manager, blue-team, red-team, judge, branch-namer, pr-creator${NC}"
+if [ -d "$AGENTS_DEST" ]; then
+    AGENT_COUNT=$(ls -1 "$AGENTS_DEST" | grep -c '\.md$')
+    echo -e "  ${GREEN}✅ Agents installed to ~/.opencode/agents/ ($AGENT_COUNT agents)${NC}"
+    echo -e "  ${BLUE}📝 Available: manager, blue-team, red-team, judge, branch-namer, pr-creator${NC}"
 else
-    echo -e "  ${RED}❌ Failed to create agents symlink${NC}"
+    echo -e "  ${RED}❌ Failed to copy agents${NC}"
     exit 1
 fi
 echo ""
@@ -174,8 +173,9 @@ echo -e "${BOLD}With file:${NC}"
 echo "  minidani \"\$(cat prompt.md)\""
 echo ""
 echo -e "${BOLD}OpenCode agents:${NC}"
-echo "  Agents are now available globally at ~/.opencode/agents/"
+echo "  Agents installed to ~/.opencode/agents/"
 echo "  Any OpenCode project can use: @manager, @blue-team, @red-team, etc."
+echo "  To update agents, run: ./install.sh again"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
