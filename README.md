@@ -6,6 +6,24 @@ MiniDani runs 3 AI coding agents in parallel competing to implement your feature
 
 ---
 
+## Table of Contents
+
+- [What is MiniDani?](#what-is-minidani)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [How It Works](#how-it-works)
+- [Judging Criteria](#judging-criteria)
+- [Live TUI Interface](#live-tui-interface)
+- [Configuration](#configuration)
+- [Examples](#examples)
+- [Troubleshooting](#troubleshooting)
+- [Advanced Usage](#advanced-usage)
+- [How Is This Different?](#how-is-this-different)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
 ## What is MiniDani?
 
 MiniDani creates **competitive pressure** between AI agents to produce better code:
@@ -19,25 +37,17 @@ MiniDani creates **competitive pressure** between AI agents to produce better co
 
 **Smart retry:** If all scores < 80, MiniDani automatically runs Round 2 with improvement feedback.
 
+[↑ Back to top](#table-of-contents)
+
 ---
 
 ## Quick Start
 
-### Requirements
-
 ```bash
+# 1. Install dependencies
 pip install -r requirements.txt
-```
 
-**Dependencies:**
-- Python 3.8+
-- Git
-- [OpenCode CLI](https://github.com/unit-mesh/opencode) installed at `~/.opencode/bin/opencode`
-- Rich library (for TUI, auto-installed via requirements.txt)
-
-### Usage
-
-```bash
+# 2. Run in your project
 cd /path/to/your/project
 python3 /path/to/minidani.py "Add OAuth2 authentication with JWT tokens"
 ```
@@ -47,6 +57,72 @@ python3 /path/to/minidani.py "Add OAuth2 authentication with JWT tokens"
 - Live TUI shows progress (phases, managers, scores, activity log)
 - After 5-10 minutes, you have the best solution auto-selected
 - Winner branch is ready for PR
+
+[↑ Back to top](#table-of-contents)
+
+---
+
+## Installation
+
+### Prerequisites
+
+- **Python 3.8+**
+  ```bash
+  python3 --version
+  ```
+
+- **Git**
+  ```bash
+  git --version
+  ```
+
+- **OpenCode CLI** - Install from [OpenCode](https://github.com/unit-mesh/opencode)
+  ```bash
+  # Verify installation
+  opencode --version
+  ```
+
+### Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/DaniFdz/ai-workflow.git
+   cd ai-workflow
+   ```
+
+2. **Install Python dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Make script executable** (optional)
+   ```bash
+   chmod +x minidani.py
+   
+   # Add alias to your shell
+   echo 'alias minidani="python3 ~/ai-workflow/minidani.py"' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+### Verify Installation
+
+```bash
+# Test Python dependencies
+python3 -c "import rich; print('✅ Rich installed')"
+
+# Test OpenCode
+opencode --version
+
+# Test MiniDani (creates temporary test repo)
+cd /tmp
+mkdir test-minidani && cd test-minidani
+git init
+echo "# Test" > README.md
+git add . && git commit -m "init"
+python3 ~/ai-workflow/minidani.py "Create hello.py that prints hello world"
+```
+
+[↑ Back to top](#table-of-contents)
 
 ---
 
@@ -95,6 +171,10 @@ Round 1: A=45, B=50, C=40  ⚠️  Low quality detected
 Round 2: A=85, B=88, C=82  ✅ Winner: B (88/100)
 ```
 
+**Note:** The `.opencode/agents/*.md` files are **reference templates** showing how a multi-agent system could be structured. The actual implementation directly calls OpenCode with custom prompts (see `minidani.py`).
+
+[↑ Back to top](#table-of-contents)
+
 ---
 
 ## Judging Criteria
@@ -113,6 +193,8 @@ Judges evaluate on 4 dimensions:
 - **80-89**: Good - functional with minor issues
 - **70-79**: Acceptable - works but needs polish
 - **<70**: Insufficient - missing features or broken
+
+[↑ Back to top](#table-of-contents)
 
 ---
 
@@ -156,6 +238,8 @@ While running, you see:
  🏆 Winner: B
 ```
 
+[↑ Back to top](#table-of-contents)
+
 ---
 
 ## Configuration
@@ -168,6 +252,11 @@ Edit `minidani.py`:
 self.QUALITY_THRESHOLD = 80  # Change to 70 or 90
 ```
 
+**Recommended values:**
+- `70` - Less strict (fewer retries)
+- `80` - Balanced (default)
+- `90` - Very strict (more retries, better quality)
+
 ### Timeouts
 
 ```python
@@ -178,32 +267,7 @@ r = self.run_oc(..., timeout=480)
 r = self.run_oc(..., timeout=120)
 ```
 
----
-
-## Project Structure
-
-```
-minidani/
-├── minidani.py              # Main script (TUI + retry logic)
-├── requirements.txt         # Python dependencies (rich)
-├── INSTALL.md              # Installation guide
-├── README.md               # This file
-├── LICENSE                 # MIT license
-│
-├── .opencode/              # OpenCode agent templates (reference)
-│   ├── agents/             # Agent definitions (not directly used)
-│   └── skills/             # Skills (for future extensions)
-│
-├── docs/
-│   ├── ARCHITECTURE.md     # Technical design
-│   └── QUICKSTART.md       # 5-minute guide
-│
-└── examples/
-    ├── simple-task.sh      # Example: simple feature
-    └── complex-task.sh     # Example: complex feature
-```
-
-**Note:** The `.opencode/agents/*.md` files are **reference templates** showing how a multi-agent system could be structured. The actual implementation directly calls OpenCode with custom prompts (see `minidani.py`).
+[↑ Back to top](#table-of-contents)
 
 ---
 
@@ -243,6 +307,8 @@ Round 2: A=85, B=88, C=82  ✅ Improved with feedback
 Winner: B (88/100)
 ```
 
+[↑ Back to top](#table-of-contents)
+
 ---
 
 ## Troubleshooting
@@ -250,11 +316,13 @@ Winner: B (88/100)
 ### OpenCode not found
 
 ```bash
-# Check installation
-ls -la ~/.opencode/bin/opencode
+# Check if OpenCode is installed
+opencode --version
 
-# Add to PATH if needed
-export PATH="$HOME/.opencode/bin:$PATH"
+# If not in PATH, find it
+which opencode
+
+# Install from: https://github.com/unit-mesh/opencode
 ```
 
 ### Worktree conflicts
@@ -278,6 +346,14 @@ git branch -D feature/name-r1-a
 - OpenCode having issues
 
 **Solution:** MiniDani will auto-retry. If Round 2 also fails, check OpenCode logs.
+
+### ModuleNotFoundError: No module named 'rich'
+
+```bash
+pip install -r requirements.txt
+```
+
+[↑ Back to top](#table-of-contents)
 
 ---
 
@@ -308,6 +384,8 @@ Currently hardcoded to 3 (A, B, C). To change:
 2. Update all loops: `for m in ["a","b","c"]` → `for m in ["a","b","c","d"]`
 3. Update Phase 2 setup and cleanup logic
 
+[↑ Back to top](#table-of-contents)
+
 ---
 
 ## How Is This Different?
@@ -320,25 +398,7 @@ Currently hardcoded to 3 (A, B, C). To change:
 
 **MiniDani's advantage:** Competitive pressure + parallel execution = better results in the same time as a single refined attempt.
 
----
-
-## Limitations
-
-- **OpenCode dependency:** Requires OpenCode CLI installed and working
-- **Compute cost:** Runs 3 instances in parallel (3x API calls)
-- **Git worktrees:** Requires clean git state, no conflicts
-- **No LangChain/Autogen:** Direct OpenCode subprocess calls (simpler, more reliable)
-
----
-
-## Future Ideas
-
-- [ ] Support 5+ managers
-- [ ] Web UI instead of terminal TUI
-- [ ] Support other AI coding tools (Aider, Cursor, Claude Code)
-- [ ] Persistent judging database (learn what "good" means)
-- [ ] Team mode (Red team implements, Blue team reviews)
-- [ ] Streaming logs from OpenCode in real-time
+[↑ Back to top](#table-of-contents)
 
 ---
 
@@ -351,29 +411,12 @@ Improvements welcome:
 3. Test with multiple tasks
 4. Create PR with clear description
 
+[↑ Back to top](#table-of-contents)
+
 ---
 
 ## License
 
 MIT License - Use freely, improve, share.
 
----
-
-## Credits
-
-- **[OpenCode](https://github.com/unit-mesh/opencode)** - AI coding tool powering each manager
-- **[Rich](https://github.com/Textualize/rich)** - Beautiful TUI library
-- **Claude/Anthropic** - AI model behind OpenCode
-
----
-
-## Contact
-
-- **Issues:** [GitHub Issues](https://github.com/DaniFdz/ai-workflow/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/DaniFdz/ai-workflow/discussions)
-
----
-
-**Version:** 1.0.0  
-**Last updated:** 2026-01-31  
-**Author:** DaniFdz (with help from JuanBot 🦞)
+[↑ Back to top](#table-of-contents)
