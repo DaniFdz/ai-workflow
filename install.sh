@@ -65,8 +65,39 @@ deactivate
 echo -e "  ${GREEN}✅ Dependencies installed${NC}"
 echo ""
 
-# Step 3: Find installation directory
-echo -e "${BOLD}[3/4] Finding installation directory...${NC}"
+# Step 3: Setup OpenCode agents
+echo -e "${BOLD}[3/5] Setting up OpenCode agents...${NC}"
+
+OPENCODE_DIR="$HOME/.opencode"
+AGENTS_SOURCE="$SCRIPT_DIR/.opencode/agents"
+AGENTS_LINK="$OPENCODE_DIR/agents"
+
+# Create .opencode directory if it doesn't exist
+mkdir -p "$OPENCODE_DIR"
+
+# Remove existing agents link/directory if present
+if [ -L "$AGENTS_LINK" ]; then
+    echo -e "  ${YELLOW}⚠️  Removing existing agents symlink${NC}"
+    rm "$AGENTS_LINK"
+elif [ -d "$AGENTS_LINK" ]; then
+    echo -e "  ${YELLOW}⚠️  Backing up existing agents directory${NC}"
+    mv "$AGENTS_LINK" "${AGENTS_LINK}.backup.$(date +%s)"
+fi
+
+# Create symlink
+ln -sf "$AGENTS_SOURCE" "$AGENTS_LINK"
+
+if [ -L "$AGENTS_LINK" ] && [ -d "$AGENTS_LINK" ]; then
+    echo -e "  ${GREEN}✅ Agents linked: ~/.opencode/agents/ -> $AGENTS_SOURCE${NC}"
+    echo -e "  ${BLUE}📝 Available agents: manager, blue-team, red-team, judge, branch-namer, pr-creator${NC}"
+else
+    echo -e "  ${RED}❌ Failed to create agents symlink${NC}"
+    exit 1
+fi
+echo ""
+
+# Step 4: Find installation directory
+echo -e "${BOLD}[4/5] Finding installation directory...${NC}"
 
 POSSIBLE_BINS=(
     "$HOME/.local/bin"
@@ -108,8 +139,8 @@ if [ -z "$INSTALL_DIR" ]; then
     echo ""
 fi
 
-# Step 4: Create wrapper script
-echo -e "${BOLD}[4/4] Creating wrapper script...${NC}"
+# Step 5: Create wrapper script
+echo -e "${BOLD}[5/5] Creating wrapper script...${NC}"
 
 WRAPPER_PATH="$INSTALL_DIR/minidani"
 
@@ -141,6 +172,10 @@ echo "  minidani \"Your prompt here\""
 echo ""
 echo -e "${BOLD}With file:${NC}"
 echo "  minidani \"\$(cat prompt.md)\""
+echo ""
+echo -e "${BOLD}OpenCode agents:${NC}"
+echo "  Agents are now available globally at ~/.opencode/agents/"
+echo "  Any OpenCode project can use: @manager, @blue-team, @red-team, etc."
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
