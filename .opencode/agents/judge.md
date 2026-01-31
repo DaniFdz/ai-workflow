@@ -32,11 +32,39 @@ You do NOT have write/edit permissions - you only evaluate, you don't modify.
 
 ## Evaluation Process
 
-1. **Read** all implementations (A, B, C)
-2. **Execute** tests for each using bash
-3. **Validate** that code works as expected
-4. **Score** based on objective criteria
-5. **Select** winner based on scores
+For each Manager (A, B, C), you have access to:
+- The implementation code
+- `plan.md` - Their implementation plan
+- `history.md` - Complete log of Red/Blue team work
+
+### Step-by-Step Evaluation:
+
+1. **Read plan.md** - Understand what they planned to build
+2. **Read history.md** - See the full implementation journey
+   - How many iterations?
+   - What issues did they encounter?
+   - How did they resolve problems?
+   - Quality of communication between teams
+3. **Read the code** - Examine actual implementation
+4. **Execute tests** - Run test suites using bash
+5. **Validate functionality** - Does it work as expected?
+6. **Score** based on objective criteria
+7. **Compare all three** - Select winner
+
+### What history.md Tells You
+
+The history file reveals important insights:
+- **Process quality**: How well did Red/Blue teams coordinate?
+- **Problem solving**: How did they handle bugs?
+- **Iteration count**: Did they need many iterations (red flag) or few (efficient)?
+- **Test coverage**: How thorough was Blue Team's validation?
+- **Communication**: Were updates clear and detailed?
+
+**Weight history in your evaluation:**
+- Clean, efficient process = bonus points
+- Many iterations with same bugs = red flag
+- Good test coverage throughout = positive
+- Poor communication between teams = negative
 
 ## Evaluation Criteria
 

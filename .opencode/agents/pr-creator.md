@@ -21,6 +21,13 @@ Create comprehensive, well-structured PR descriptions that help reviewers unders
 - How it works
 - How to test it
 
+**IMPORTANT:** When reviewing files for the PR description:
+- **Ignore internal files**: `plan.md`, `history.md`, `.opencode/*`
+- **Focus on production files**: Source code, tests, docs, config
+- Only describe files that should be merged to main branch
+
+Internal working files will be cleaned up separately - your job is just to describe the production-ready changes.
+
 ## PR Description Template
 
 ```markdown
