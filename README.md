@@ -15,7 +15,6 @@ MiniDani runs 3 AI coding agents in parallel competing to implement your feature
 - [Judging Criteria](#judging-criteria)
 - [Live TUI Interface](#live-tui-interface)
 - [Configuration](#configuration)
-- [Examples](#examples)
 - [Troubleshooting](#troubleshooting)
 - [Advanced Usage](#advanced-usage)
 - [How Is This Different?](#how-is-this-different)
@@ -265,46 +264,6 @@ r = self.run_oc(..., timeout=480)
 
 # Judge timeout (default: 2 minutes)
 r = self.run_oc(..., timeout=120)
-```
-
-[↑ Back to top](#table-of-contents)
-
----
-
-## Examples
-
-### Simple Task
-
-```bash
-python3 minidani.py "Create a function to validate email addresses with regex"
-```
-
-**Result:** 3 implementations compete, best one selected in ~2 minutes.
-
-### Complex Task
-
-```bash
-python3 minidani.py "Build a REST API with:
-- User authentication (JWT)
-- CRUD operations for posts
-- SQLite database
-- Pytest test suite
-- Docker setup"
-```
-
-**Result:** 3 full implementations compete, best one selected in ~10 minutes.
-
-### With Retry
-
-```bash
-python3 minidani.py "Hello world script"
-```
-
-**Result:**
-```
-Round 1: A=45, B=50, C=40  ⚠️  Too simple, low scores
-Round 2: A=85, B=88, C=82  ✅ Improved with feedback
-Winner: B (88/100)
 ```
 
 [↑ Back to top](#table-of-contents)
