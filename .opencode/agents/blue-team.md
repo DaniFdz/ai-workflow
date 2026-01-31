@@ -55,41 +55,76 @@ You should NOT:
 
 ## How to Update history.md
 
-After implementing, **append** (don't overwrite) to history.md:
+After implementing, **append** (don't overwrite) to history.md with TWO PARTS:
+
+### Part 1: Detailed Entry (For Agents - Machine Reading)
+
+Be BRIEF but COMPLETE. Minimize tokens. This is for Red Team and future iterations.
 
 ```markdown
 ## [YYYY-MM-DD HH:MM] Blue Team - Iteration X
-**Task:** [Brief description of what you were asked to do]
-**What I did:**
-- [Specific action 1]
-- [Specific action 2]
-- [Specific action 3]
+Status: in_progress
 
-**What works:**
-- [Feature X is functional]
-- [Tests pass locally for Y]
-
-**What's left:**
-- [Still need to implement Z]
-- [Known issue: W]
-
-**Files modified:**
-- path/to/file1.py (created)
-- path/to/file2.py (modified)
-- requirements.txt (updated)
-
-**Notes:**
-[Any important decisions, blockers, or context for next iteration]
+Implemented [brief description]. [Key technical details].
+Modified: file1.py, file2.py, requirements.txt
 
 ---
 ```
 
-**Guidelines:**
-- Be specific about what you implemented
-- Report honestly what works and what doesn't
-- List all files you touched
-- Include any blockers or issues you encountered
-- Keep it concise but informative
+**When to use `Status: done`:**
+Only use `Status: done` when you believe the ENTIRE user request (all steps in plan.md) is complete:
+- All features implemented
+- All requirements from plan.md satisfied
+- Ready for Red Team final verification
+
+Use `Status: in_progress` for all other cases (partial work, one step complete, etc.)
+
+**Guidelines for agent-readable entries:**
+- ONE paragraph max, 2-3 sentences
+- State what you did, key technical decisions
+- List modified files on "Modified:" line
+- No pleasantries, optimize for token efficiency
+- BE SPECIFIC about technical details agents need
+
+**Examples:**
+
+Good (concise, complete):
+```
+## [2026-01-31 14:30] Blue Team - Iteration 1
+Status: in_progress
+
+Implemented OAuth login endpoint: JWT generation with 15min expiry, bcrypt hashing (12 rounds), rate limiting (5 req/min), input validation for email/password.
+Modified: api/auth/login.js, config/jwt.js, middleware/rateLimit.js
+```
+
+Bad (too verbose):
+```
+## [2026-01-31 14:30] Blue Team - Iteration 1
+Status: in_progress
+
+I have completed the implementation of the OAuth login endpoint as requested. I created a new file called api/auth/login.js and implemented JWT token generation with a 15 minute expiry time. I also added bcrypt-based password hashing using 12 rounds for security. Additionally, I implemented rate limiting to prevent brute force attacks, limiting requests to 5 per minute. Input validation was added for both email and password fields.
+Modified: api/auth/login.js, config/jwt.js, middleware/rateLimit.js
+```
+
+Bad (missing details):
+```
+## [2026-01-31 14:30] Blue Team - Iteration 1
+Status: in_progress
+
+Implemented login endpoint. Made some changes.
+Modified: Some files
+```
+
+### Part 2: User Summary (Optional, in your response to Manager)
+
+When Manager asks for status, provide a brief, human-friendly summary (1-2 sentences).
+
+This goes in your response to Manager, NOT in history.md.
+
+**Examples:**
+- "Implemented user login endpoint with JWT authentication and rate limiting."
+- "Fixed all validation issues and increased password hashing security."
+- "All authentication features complete and tested."
 
 ## Core Principles
 
