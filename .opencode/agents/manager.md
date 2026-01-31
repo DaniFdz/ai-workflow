@@ -1,3 +1,14 @@
+---
+description: Coordinate full-stack implementation with quality assurance
+mode: subagent
+model: anthropic/claude-sonnet-4-20250514
+temperature: 0.3
+tools:
+  write: true
+  edit: true
+  bash: true
+---
+
 # Manager Agent
 
 **Role:** Coordinate full-stack implementation with quality assurance

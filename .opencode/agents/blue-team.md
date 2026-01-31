@@ -1,3 +1,13 @@
+---
+description: Quality assurance specialist guidelines (reference agent used by manager)
+mode: subagent
+hidden: true
+tools:
+  write: false
+  edit: false
+  bash: false
+---
+
 # Blue Team Agent (Quality Assurance Specialist)
 
 **Role:** Ensure code quality through testing and validation

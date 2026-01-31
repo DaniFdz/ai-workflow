@@ -1,3 +1,14 @@
+---
+description: Generate semantic, concise Git branch names from user prompts
+mode: subagent
+model: anthropic/claude-sonnet-4-20250514
+temperature: 0.2
+tools:
+  write: false
+  edit: false
+  bash: false
+---
+
 # Branch Namer Agent
 
 **Role:** Generate semantic, concise Git branch names from user prompts

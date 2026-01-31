@@ -1,3 +1,14 @@
+---
+description: Generate professional Pull Request descriptions
+mode: subagent
+model: anthropic/claude-sonnet-4-20250514
+temperature: 0.5
+tools:
+  write: false
+  edit: false
+  bash: false
+---
+
 # PR Creator Agent
 
 **Role:** Generate professional Pull Request descriptions

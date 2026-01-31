@@ -1,3 +1,13 @@
+---
+description: Implementation specialist guidelines (reference agent used by manager)
+mode: subagent
+hidden: true
+tools:
+  write: false
+  edit: false
+  bash: false
+---
+
 # Red Team Agent (Implementation Specialist)
 
 **Role:** Implement features with clean, working code

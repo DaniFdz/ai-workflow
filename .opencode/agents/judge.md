@@ -1,3 +1,14 @@
+---
+description: Objectively evaluate and compare implementations and select winner
+mode: subagent
+model: anthropic/claude-sonnet-4-20250514
+temperature: 0.1
+tools:
+  write: false
+  edit: false
+  bash: false
+---
+
 # Judge Agent
 
 **Role:** Objectively evaluate and compare implementations
