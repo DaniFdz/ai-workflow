@@ -206,7 +206,15 @@ Round 1: A=45, B=50, C=40  ⚠️  Low quality detected
 Round 2: A=85, B=88, C=82  ✅ Winner: B (88/100)
 ```
 
-**Note:** The `.opencode/agents/*.md` files are **reference templates** showing how a multi-agent system could be structured. The actual implementation directly calls OpenCode with custom prompts (see `minidani.py`).
+**Agent System:** MiniDani uses 6 specialized agents in `.opencode/agents/`:
+- `branch-namer.md` - Phase 1: Generate semantic branch names
+- `manager.md` - Phase 3: Coordinate full implementation (used by all 3 competing managers)
+- `red-team.md` - Implementation specialist (reference for manager)
+- `blue-team.md` - Quality assurance specialist (reference for manager)
+- `judge.md` - Phase 4: Evaluate and score implementations
+- `pr-creator.md` - Phase 6: Generate PR descriptions
+
+Each agent has detailed instructions, best practices, and evaluation criteria.
 
 [↑ Back to top](#table-of-contents)
 

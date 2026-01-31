@@ -127,8 +127,16 @@ class MiniDaniRetry:
         footer_text = f"🏆 Winner: {self.state.winner.upper()}" if self.state.winner else "Running..."
         layout["footer"].update(Panel(Text(footer_text, style="bold green" if self.state.winner else "dim"), border_style="dim"))
     
-    def run_oc(self, p, c=None, t=300):
+    def run_oc(self, p, c=None, t=300, agent=None):
+        """Run OpenCode with optional agent system prompt"""
         try:
+            # If agent is specified, prepend agent instructions to prompt
+            if agent:
+                agent_path = Path(__file__).parent / ".opencode" / "agents" / f"{agent}.md"
+                if agent_path.exists():
+                    agent_prompt = agent_path.read_text()
+                    p = f"{agent_prompt}\n\n---\n\n{p}"
+            
             r = subprocess.run([str(self.opencode), "-p", p, "-f", "json"] + (["-c", str(c)] if c else []), 
                              capture_output=True, text=True, timeout=t)
             return json.loads(r.stdout) if r.returncode==0 else None
@@ -138,7 +146,7 @@ class MiniDaniRetry:
         if self.state.branch_base:  # Already have branch from round 1
             return
         self.log("Gen branch"); self.state.current_phase=0
-        r = self.run_oc(f"Git branch name for: {self.user_prompt[:80]}\nFormat: feature/desc (max 50). ONLY name.", self.repo_path)
+        r = self.run_oc(f"Task description:\n{self.user_prompt}", self.repo_path, agent="branch-namer")
         bn = "feature/task"
         if r:
             for l in r.get("response","").split("\n"):
@@ -184,8 +192,8 @@ class MiniDaniRetry:
         try:
             m.phase, m.last_activity, m.iteration = "Impl", "Working...", 1
             # Timeout: 20 min base + 10 min per iteration (30 min for iteration 1)
-            r = self.run_oc(f"Manager {mid.upper()}. Task: {self.user_prompt}{feedback}\nCreate the BEST implementation.", 
-                          m.worktree, 1800)
+            r = self.run_oc(f"User task:\n{self.user_prompt}{feedback}", 
+                          m.worktree, t=1800, agent="manager")
             if r:
                 m.summary, m.status, m.last_activity = r.get("response","")[:500], "complete", "Done"
                 subprocess.run(["git","add","."], cwd=m.worktree)
@@ -218,16 +226,19 @@ class MiniDaniRetry:
                 for m in ["a","b","c"]]
         self.state.phase_progress[3]=50
         
-        r = self.run_oc(f"""Judge these 3 implementations of: {self.user_prompt[:150]}
+        r = self.run_oc(f"""Original task: {self.user_prompt[:150]}
 
-{chr(10).join(sums)}
+Manager A Summary:
+{self.state.managers['a'].summary[:200] if self.state.managers['a'].status=='complete' else 'FAILED'}
 
-Score 0-100 based on: Completeness(35), Quality(30), Correctness(25), Practices(10).
-Be strict but fair. A simple working solution should get 80-90.
-A comprehensive solution with tests and docs should get 90-100.
+Manager B Summary:
+{self.state.managers['b'].summary[:200] if self.state.managers['b'].status=='complete' else 'FAILED'}
 
-JSON: {{"scores":{{"a":X,"b":Y,"c":Z}},"winner":"a/b/c","rationale":"..."}}""", 
-                       self.repo_path, 480)
+Manager C Summary:
+{self.state.managers['c'].summary[:200] if self.state.managers['c'].status=='complete' else 'FAILED'}
+
+Evaluate and provide JSON response.""", 
+                       self.repo_path, t=480, agent="judge")
         
         if r:
             try:
@@ -291,8 +302,16 @@ JSON: {{"scores":{{"a":X,"b":Y,"c":Z}},"winner":"a/b/c","rationale":"..."}}""",
     def p6_pr(self):
         self.log("PR desc"); self.state.current_phase=5
         w = self.state.managers[self.state.winner]
-        r = self.run_oc(f"PR for: {self.user_prompt[:150]}\nSummary: {w.summary[:200]}\nWinner: M{self.state.winner.upper()} ({w.score}/100) Round {w.round}\nMarkdown.", 
-                       self.repo_path, 90)
+        r = self.run_oc(f"""Original task: {self.user_prompt}
+
+Winning implementation: Manager {self.state.winner.upper()}
+Score: {w.score}/100
+Round: {w.round}
+
+Summary: {w.summary}
+
+Generate PR description.""", 
+                       self.repo_path, t=300, agent="pr-creator")
         if r:
             (w.worktree / "PR_DESCRIPTION.md").write_text(r.get("response",""))
             self.log("PR done", lvl="SUCCESS")
