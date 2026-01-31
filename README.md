@@ -355,19 +355,6 @@ pip install -r requirements.txt
 
 ## Advanced Usage
 
-### Custom Repository Path
-
-Edit `minidani.py`:
-
-```python
-if __name__ == "__main__":
-    # Change from /tmp/minidani-test-repo to your repo
-    minidani = MiniDaniRetry(
-        Path("/path/to/your/repo"),
-        " ".join(sys.argv[1:])
-    )
-```
-
 ### Run Without TUI (headless)
 
 Comment out the `with Live(...)` block and use plain print statements.

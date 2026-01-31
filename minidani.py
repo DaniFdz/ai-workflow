@@ -354,10 +354,13 @@ JSON: {{"scores":{{"a":X,"b":Y,"c":Z}},"winner":"a/b/c","rationale":"..."}}""",
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python3 minidani_retry.py 'task'")
+        print("Usage: python3 minidani.py 'task'")
         sys.exit(1)
     
-    minidani = MiniDaniRetry(Path("/tmp/minidani-test-repo"), " ".join(sys.argv[1:]))
+    # Use current working directory as the repository path
+    repo_path = Path.cwd()
+    
+    minidani = MiniDaniRetry(repo_path, " ".join(sys.argv[1:]))
     result = minidani.run()
     
     print("\n" + "="*70)
