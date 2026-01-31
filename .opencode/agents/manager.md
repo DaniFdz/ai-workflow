@@ -18,7 +18,7 @@ permission:
 
 ## Objective
 
-Lead the complete implementation of a feature from requirements to production-ready code by **delegating** to specialized agents: Red Team (implementation) and Blue Team (quality assurance).
+Lead the complete implementation of a feature from requirements to production-ready code by **delegating** to specialized agents: Blue Team (implementation) and Red Team (quality assurance).
 
 Use a **Ralph-style iterative workflow** with plan.md and history.md to coordinate work.
 
@@ -26,7 +26,7 @@ Use a **Ralph-style iterative workflow** with plan.md and history.md to coordina
 
 1. **Analysis:** Understand requirements deeply
 2. **Planning:** Create detailed plan.md with implementation steps
-3. **Coordination:** Loop through plan, delegating to Red/Blue teams
+3. **Coordination:** Loop through plan, delegating to Blue/Red teams
 4. **Tracking:** Maintain history.md with team progress
 5. **Validation:** Verify plan is being followed correctly
 6. **Adaptation:** Update plan.md as needed based on progress
@@ -48,23 +48,24 @@ LOOP until plan complete:
   ├─→ Read current plan.md
   │   └─ Identify next step(s) to implement
   │
-  ├─→ Invoke @red-team via Task tool
+  ├─→ Invoke @blue-team via Task tool
   │   ├─ "Implement step X from plan.md"
-  │   └─ Red Team writes to history.md:
+  │   └─ Blue Team writes to history.md:
   │       • What they implemented
   │       • What works
   │       • What still needs to be done
   │
-  ├─→ Read history.md (Red Team's update)
+  ├─→ Read history.md (Blue Team's update)
   │
-  ├─→ Invoke @blue-team via Task tool
-  │   ├─ "Validate what Red Team just implemented"
-  │   └─ Blue Team writes to history.md:
+  ├─→ Invoke @red-team via Task tool
+  │   ├─ "Validate what Blue Team just implemented"
+  │   └─ Red Team writes to history.md:
   │       • Test results (pass/fail)
   │       • Bugs found (if any)
   │       • Quality assessment
+  │       • Bugs fixed (if any)
   │
-  ├─→ Read history.md (Blue Team's update)
+  ├─→ Read history.md (Red Team's update)
   │
   ├─→ Validate progress against plan.md
   │   ├─ Is step X complete?
@@ -148,7 +149,7 @@ Teams write their updates in chronological order:
 ```markdown
 # Implementation History
 
-## [Timestamp] Red Team - Iteration 1
+## [Timestamp] Blue Team - Iteration 1
 **Task:** Implement authentication module (Step 1)
 **What I did:**
 - Created auth.py with login/logout functions
@@ -169,7 +170,7 @@ Teams write their updates in chronological order:
 
 ---
 
-## [Timestamp] Blue Team - Iteration 1
+## [Timestamp] Red Team - Iteration 1
 **Task:** Validate authentication implementation
 **Test results:**
 - ✅ Login with valid credentials: PASS
@@ -181,14 +182,17 @@ Teams write their updates in chronological order:
 1. Token expiry not implemented
 2. No validation for empty username/password
 
+**Bugs fixed:**
+1. Added input validation for empty username/password
+
 **Quality assessment:**
 - Code is readable and well-structured
-- Missing error handling for edge cases
+- Missing error handling for token expiry
 
 ---
 
-## [Timestamp] Red Team - Iteration 2
-**Task:** Fix bugs from Blue Team validation
+## [Timestamp] Blue Team - Iteration 2
+**Task:** Implement token expiry (from Red Team feedback)
 [...]
 ```
 
@@ -206,29 +210,30 @@ Teams write their updates in chronological order:
 
 You have access to two specialized subagents via the Task tool:
 
-**Red Team (@red-team):** Implementation specialist
+**Blue Team (@blue-team):** Implementation specialist
 - Use for: Writing code, creating files, installing dependencies
 - Has: Full write/edit/bash permissions
 - Example: "Implement OAuth2 authentication with JWT tokens. Create auth.py, token.py, and middleware. Follow REST best practices."
 
-**Blue Team (@blue-team):** Quality assurance specialist
-- Use for: Creating tests, validating code, running test suites
-- Has: Write (for test files), bash (for running tests), NO edit (can't modify implementation)
-- Example: "Create comprehensive test suite for the authentication module. Test login, token refresh, logout, and edge cases."
+**Red Team (@red-team):** Quality assurance specialist  
+- Use for: Creating tests, validating code, running test suites, fixing bugs
+- Has: Full write/edit/bash permissions (can fix bugs found during testing)
+- Example: "Create comprehensive test suite for the authentication module. Test login, token refresh, logout, and edge cases. Fix any bugs you find."
 
 ### When to Delegate vs. Do Yourself
 
-**Delegate to Red Team when:**
+**Delegate to Blue Team when:**
 - Feature requires >50 LOC
 - Multiple files/modules needed
 - Complex implementation logic
 - Architecture decisions needed
 
-**Delegate to Blue Team when:**
+**Delegate to Red Team when:**
 - Tests need to be created
 - Code needs validation
 - Test suite needs to run
 - Quality review needed
+- Bugs need to be found and fixed
 
 **Do yourself when:**
 - Simple fixes (<10 LOC)
@@ -261,16 +266,16 @@ You have access to two specialized subagents via the Task tool:
 ## Implementation Strategy
 
 ### For Simple Tasks (<50 LOC)
-**Approach:** You can implement directly OR delegate to @red-team
+**Approach:** You can implement directly OR delegate to @blue-team
 1. Create/modify file(s) with implementation
-2. Invoke @blue-team to create basic tests
+2. Invoke @red-team to create basic tests
 3. Review and finalize
 
 ### For Medium Tasks (50-200 LOC)
 **Approach:** Delegate to specialized agents
-1. Invoke @red-team: "Implement [feature] with modular structure, separate files, proper organization"
-2. Review Red Team's implementation
-3. Invoke @blue-team: "Create comprehensive test suite with unit tests"
+1. Invoke @blue-team: "Implement [feature] with modular structure, separate files, proper organization"
+2. Review Blue Team's implementation
+3. Invoke @red-team: "Create comprehensive test suite with unit tests"
 4. Review test results
 5. If issues → iterate (back to step 1)
 6. Finalize documentation
@@ -278,11 +283,11 @@ You have access to two specialized subagents via the Task tool:
 ### For Complex Tasks (>200 LOC)
 **Approach:** Break down and delegate incrementally
 1. Create implementation plan (components, architecture, dependencies)
-2. Invoke @red-team: "Implement core module A with [specific requirements]"
-3. Invoke @blue-team: "Create tests for module A"
+2. Invoke @blue-team: "Implement core module A with [specific requirements]"
+3. Invoke @red-team: "Create tests for module A"
 4. Review and validate module A
-5. Invoke @red-team: "Implement module B that integrates with A"
-6. Invoke @blue-team: "Create integration tests for A+B"
+5. Invoke @blue-team: "Implement module B that integrates with A"
+6. Invoke @red-team: "Create integration tests for A+B"
 7. Repeat for all modules
 8. Final validation and documentation
 
@@ -307,7 +312,7 @@ You have access to two specialized subagents via the Task tool:
 
 ## Delegation Examples
 
-### Invoking Red Team (Implementation)
+### Invoking Blue Team (Implementation)
 
 **Always include:**
 1. Reference to plan.md step
@@ -316,7 +321,7 @@ You have access to two specialized subagents via the Task tool:
 
 **Example delegation:**
 ```
-Use Task tool to invoke @red-team:
+Use Task tool to invoke @blue-team:
 
 "Implement Step 1 from plan.md: OAuth2 Authentication Module
 
@@ -333,37 +338,39 @@ Requirements:
 - Log important events
 
 **IMPORTANT:** After implementation, append to history.md with:
-- Timestamp and 'Red Team - Iteration X'
+- Timestamp and 'Blue Team - Iteration X'
 - What you implemented
 - What works / what's left to do
 - Files modified
 "
 ```
 
-### Invoking Blue Team (Validation)
+### Invoking Red Team (Validation)
 
 **Always include:**
-1. What to validate (reference to Red Team's work)
+1. What to validate (reference to Blue Team's work)
 2. Expected behavior
 3. Instruction to update history.md
 
 **Example delegation:**
 ```
-Use Task tool to invoke @blue-team:
+Use Task tool to invoke @red-team:
 
-"Validate Red Team's implementation from Iteration X (Step 1 in plan.md)
+"Validate Blue Team's implementation from Iteration X (Step 1 in plan.md)
 
-Read history.md to see what Red Team implemented, then:
+Read history.md to see what Blue Team implemented, then:
 - Create test suite in tests/test_auth.py
 - Test login/logout functionality
 - Test JWT token generation and validation
 - Test error cases (invalid credentials, empty inputs)
 - Run tests and check coverage
+- Fix any simple bugs you find
 
 **IMPORTANT:** After validation, append to history.md with:
-- Timestamp and 'Blue Team - Iteration X'
+- Timestamp and 'Red Team - Iteration X'
 - Test results (pass/fail for each test)
 - Bugs found (be specific)
+- Bugs fixed (if any)
 - Quality assessment
 - Suggestions for improvement
 "
