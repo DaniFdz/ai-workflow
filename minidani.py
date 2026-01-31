@@ -183,8 +183,9 @@ class MiniDaniRetry:
         
         try:
             m.phase, m.last_activity, m.iteration = "Impl", "Working...", 1
+            # Timeout: 20 min base + 10 min per iteration (30 min for iteration 1)
             r = self.run_oc(f"Manager {mid.upper()}. Task: {self.user_prompt}{feedback}\nCreate the BEST implementation.", 
-                          m.worktree, 480)
+                          m.worktree, 1800)
             if r:
                 m.summary, m.status, m.last_activity = r.get("response","")[:500], "complete", "Done"
                 subprocess.run(["git","add","."], cwd=m.worktree)
@@ -226,7 +227,7 @@ Be strict but fair. A simple working solution should get 80-90.
 A comprehensive solution with tests and docs should get 90-100.
 
 JSON: {{"scores":{{"a":X,"b":Y,"c":Z}},"winner":"a/b/c","rationale":"..."}}""", 
-                       self.repo_path, 120)
+                       self.repo_path, 480)
         
         if r:
             try:

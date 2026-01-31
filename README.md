@@ -87,7 +87,7 @@ python3 /path/to/minidani.py "$(cat prompt.md)"
 **What happens:**
 - 3 parallel implementations start immediately
 - Live TUI shows progress (phases, managers, scores, activity log)
-- After 5-10 minutes, you have the best solution auto-selected
+- After 30-40 minutes, you have the best solution auto-selected
 - Winner branch is ready for PR
 
 [↑ Back to top](#table-of-contents)
@@ -295,11 +295,12 @@ self.QUALITY_THRESHOLD = 80  # Change to 70 or 90
 ### Timeouts
 
 ```python
-# Manager execution timeout (default: 8 minutes per manager)
-r = self.run_oc(..., timeout=480)
+# Manager execution timeout (default: 30 minutes per manager)
+# Formula: 20 min base + 10 min per iteration
+r = self.run_oc(..., timeout=1800)
 
-# Judge timeout (default: 2 minutes)
-r = self.run_oc(..., timeout=120)
+# Judge timeout (default: 8 minutes)
+r = self.run_oc(..., timeout=480)
 ```
 
 [↑ Back to top](#table-of-contents)
