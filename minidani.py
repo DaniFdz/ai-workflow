@@ -163,8 +163,8 @@ class MiniDaniRetry:
                     agent_prompt = agent_path.read_text()
                     p = f"{agent_prompt}\n\n---\n\n{p}"
             
-            # Build command: opencode run --format json [--session <id>] <prompt>
-            cmd = [str(self.opencode), "run", "--format", "json"]
+            # Build command: opencode run --format json --model <model> [--session <id>] <prompt>
+            cmd = [str(self.opencode), "run", "--format", "json", "--model", "anthropic/claude-sonnet-4"]
             if c:
                 cmd.extend(["--session", str(c)])
             cmd.append(p)
