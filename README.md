@@ -45,17 +45,19 @@ MiniDani creates **competitive pressure** between AI agents to produce better co
 ### Basic Usage
 
 ```bash
-# 1. Install dependencies
-pip install -r requirements.txt
+# 1. Install (one-time setup)
+./install.sh
 
-# 2. Run in your project with inline prompt
+# 2. Run from any project directory
 cd /path/to/your/project
-python3 /path/to/minidani.py "Add OAuth2 authentication with JWT tokens"
+
+# Inline prompt (short tasks)
+minidani "Add OAuth2 authentication with JWT tokens"
 ```
 
 ### Using a Prompt File
 
-For complex prompts, use a file:
+For complex prompts, save to a file and use `-f`:
 
 ```bash
 # Create a prompt file
@@ -79,9 +81,14 @@ Technical requirements:
 - 80%+ test coverage
 EOF
 
-# Run with file input
-cd /path/to/your/project
-python3 /path/to/minidani.py "$(cat prompt.md)"
+# Option 1: Read from file (recommended)
+minidani -f prompt.md
+
+# Option 2: Pipe stdin
+cat prompt.md | minidani
+
+# Option 3: Redirect stdin
+minidani < prompt.md
 ```
 
 **What happens:**

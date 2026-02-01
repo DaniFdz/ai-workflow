@@ -372,14 +372,61 @@ Generate PR description.""",
                 return {"success": False, "error": str(e)}
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python3 minidani.py 'task'")
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description="MiniDani - Competitive AI workflow orchestrator",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  minidani "Create a REST API"              # Inline prompt
+  minidani -f prompt.md                      # From file
+  cat prompt.md | minidani                   # From stdin
+  minidani < prompt.md                       # From stdin redirect
+        """
+    )
+    
+    parser.add_argument(
+        "prompt",
+        nargs="*",
+        help="Task prompt (or omit to read from stdin/file)"
+    )
+    parser.add_argument(
+        "-f", "--file",
+        type=Path,
+        help="Read prompt from file"
+    )
+    
+    args = parser.parse_args()
+    
+    # Determine prompt source
+    prompt = None
+    
+    if args.file:
+        # Read from file
+        if not args.file.exists():
+            print(f"Error: File not found: {args.file}")
+            sys.exit(1)
+        prompt = args.file.read_text().strip()
+    elif args.prompt:
+        # Read from arguments
+        prompt = " ".join(args.prompt)
+    elif not sys.stdin.isatty():
+        # Read from stdin (pipe or redirect)
+        prompt = sys.stdin.read().strip()
+    else:
+        # No input provided
+        parser.print_help()
+        sys.exit(1)
+    
+    if not prompt:
+        print("Error: Empty prompt")
         sys.exit(1)
     
     # Use current working directory as the repository path
     repo_path = Path.cwd()
     
-    minidani = MiniDaniRetry(repo_path, " ".join(sys.argv[1:]))
+    minidani = MiniDaniRetry(repo_path, prompt)
     result = minidani.run()
     
     print("\n" + "="*70)
