@@ -153,7 +153,7 @@ class MiniDaniRetry:
             # Fallback for Windows - no timeout support
             return input().strip(), False
     
-    def run_oc(self, p, c=None, t=300, agent=None):
+    def run_oc(self, p, c=None, t=300, agent=None, model=None):
         """Run OpenCode with optional agent system prompt. Returns (result, error_msg)"""
         try:
             # If agent is specified, prepend agent instructions to prompt
@@ -164,7 +164,9 @@ class MiniDaniRetry:
                     p = f"{agent_prompt}\n\n---\n\n{p}"
             
             # Build command: opencode run --format json --model <model> [--session <id>] <prompt>
-            cmd = [str(self.opencode), "run", "--format", "json", "--model", "anthropic/claude-sonnet-4"]
+            # Use provided model or default to claude-sonnet-4
+            model = model or "anthropic/claude-sonnet-4"
+            cmd = [str(self.opencode), "run", "--format", "json", "--model", model]
             if c:
                 cmd.extend(["--session", str(c)])
             cmd.append(p)
@@ -203,7 +205,8 @@ Task description: {self.user_prompt}
 
 Generate a concise branch name (no prefix, just description in kebab-case)."""
         
-        r, error = self.run_oc(prompt, self.repo_path, agent="branch-namer")
+        # Use fast model (gpt-4o-mini) with short timeout for simple branch naming
+        r, error = self.run_oc(prompt, self.repo_path, t=30, agent="branch-namer", model="openai/gpt-4o-mini")
         bn = f"{self.branch_prefix}task"  # Fallback
         
         if r:
