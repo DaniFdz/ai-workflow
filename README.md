@@ -640,11 +640,27 @@ Total debug entries: 21
 - Analyzing performance bottlenecks
 - Troubleshooting manager behavior
 
+**Error logging:**
+When managers, judge, or other agents fail, debug logs capture detailed error information:
+```
+[2026-02-01 13:25:45.123] [MA      ] [ERROR  ] Fail R1
+[2026-02-01 13:25:45.124] [MA      ] [ERROR  ] Error details: Exit code 1
+Stderr: OpenCode error: model timeout
+Stdout: [partial output...]
+```
+
+This helps diagnose:
+- Why a manager failed (timeout, model error, syntax error)
+- Judge parsing errors or evaluation failures
+- PR generation issues
+- Branch name generation problems
+
 **Benefits:**
 - ✅ Doesn't clutter TUI during execution
 - ✅ Complete log history with precise timestamps
 - ✅ Easy to grep/filter for specific events
-- ✅ Helpful for bug reports
+- ✅ Detailed error messages when things fail
+- ✅ Helpful for bug reports with full context
 
 [↑ Back to top](#table-of-contents)
 

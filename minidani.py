@@ -154,7 +154,7 @@ class MiniDaniRetry:
             return input().strip(), False
     
     def run_oc(self, p, c=None, t=300, agent=None):
-        """Run OpenCode with optional agent system prompt"""
+        """Run OpenCode with optional agent system prompt. Returns (result, error_msg)"""
         try:
             # If agent is specified, prepend agent instructions to prompt
             if agent:
@@ -165,8 +165,21 @@ class MiniDaniRetry:
             
             r = subprocess.run([str(self.opencode), "-p", p, "-f", "json"] + (["-c", str(c)] if c else []), 
                              capture_output=True, text=True, timeout=t)
-            return json.loads(r.stdout) if r.returncode==0 else None
-        except: return None
+            
+            if r.returncode == 0:
+                return json.loads(r.stdout), None
+            else:
+                # Capture error information
+                error_msg = f"Exit code {r.returncode}"
+                if r.stderr:
+                    error_msg += f"\nStderr: {r.stderr[:500]}"  # First 500 chars
+                if r.stdout:
+                    error_msg += f"\nStdout: {r.stdout[:500]}"
+                return None, error_msg
+        except subprocess.TimeoutExpired:
+            return None, f"Timeout after {t}s"
+        except Exception as e:
+            return None, f"Exception: {str(e)}"
     
     def p1_branch(self):
         if self.state.branch_base:  # Already have branch from round 1
@@ -185,7 +198,7 @@ Task description: {self.user_prompt}
 
 Generate a concise branch name (no prefix, just description in kebab-case)."""
         
-        r = self.run_oc(prompt, self.repo_path, agent="branch-namer")
+        r, error = self.run_oc(prompt, self.repo_path, agent="branch-namer")
         bn = f"{self.branch_prefix}task"  # Fallback
         
         if r:
@@ -196,6 +209,8 @@ Generate a concise branch name (no prefix, just description in kebab-case)."""
                 if line.startswith(self.branch_prefix) and len(line) < 50:
                     bn = line
                     break
+        elif error and self.debug:
+            self.log(f"Branch namer failed: {error[:100]}", lvl="ERROR")
         
         # Pause TUI for user confirmation
         print("\n" + "="*70)
@@ -313,7 +328,7 @@ Generate a concise branch name (no prefix, just description in kebab-case)."""
         try:
             m.phase, m.last_activity, m.iteration = "Impl", "Working...", 1
             # Timeout: 20 min base + 10 min per iteration (30 min for iteration 1)
-            r = self.run_oc(f"User task:\n{self.user_prompt}{feedback}", 
+            r, error = self.run_oc(f"User task:\n{self.user_prompt}{feedback}", 
                           m.worktree, t=1800, agent="manager")
             if r:
                 m.summary, m.status, m.last_activity = r.get("response","")[:500], "complete", "Done"
@@ -323,10 +338,13 @@ Generate a concise branch name (no prefix, just description in kebab-case)."""
                 self.log(f"OK R{round_num}", mgr=f"M{mid.upper()}", lvl="SUCCESS")
             else:
                 m.status, m.last_activity = "failed", "Failed"
-                self.log(f"Fail R{round_num}", mgr=f"M{mid.upper()}")
+                self.log(f"Fail R{round_num}", mgr=f"M{mid.upper()}", lvl="ERROR")
+                if error:
+                    # Log detailed error in debug mode
+                    self.log(f"Error details: {error}", mgr=f"M{mid.upper()}", lvl="ERROR")
         except Exception as e:
             m.status, m.last_activity = "failed", str(e)[:30]
-            self.log(f"Err R{round_num}:{e}", mgr=f"M{mid.upper()}")
+            self.log(f"Err R{round_num}:{e}", mgr=f"M{mid.upper()}", lvl="ERROR")
     
     def p3_managers(self, round_num):
         self.log(f"3 managers (Round {round_num})"); self.state.current_phase=2
@@ -347,7 +365,7 @@ Generate a concise branch name (no prefix, just description in kebab-case)."""
                 for m in ["a","b","c"]]
         self.state.phase_progress[3]=50
         
-        r = self.run_oc(f"""Original task: {self.user_prompt[:150]}
+        r, error = self.run_oc(f"""Original task: {self.user_prompt[:150]}
 
 Manager A Summary:
 {self.state.managers['a'].summary[:200] if self.state.managers['a'].status=='complete' else 'FAILED'}
@@ -376,14 +394,25 @@ Evaluate and provide JSON response.""",
                 self.log(f"Winner: {w.upper()}", lvl="WINNER")
                 
                 return d.get("scores", {})
-            except:
-                # Fallback
+            except Exception as parse_error:
+                # Fallback - failed to parse judge response
+                self.log(f"Judge parse error: {parse_error}", lvl="ERROR")
                 for m in ["a","b","c"]:
                     if self.state.managers[m].status=="complete":
                         self.state.winner=m; self.state.managers[m].score=85
                         self.log(f"Fallback winner R{round_num}: {m.upper()}", lvl="WINNER")
                         return {"a": 85, "b": 0, "c": 0}
                 return {}
+        else:
+            # Judge failed to run
+            if error:
+                self.log(f"Judge failed: {error[:200]}", lvl="ERROR")
+            # Fallback - pick first complete manager
+            for m in ["a","b","c"]:
+                if self.state.managers[m].status=="complete":
+                    self.state.winner=m; self.state.managers[m].score=85
+                    self.log(f"Fallback winner R{round_num}: {m.upper()}", lvl="WINNER")
+                    return {m: 85}
         
         self.state.phase_progress[3]=100
         return {}
@@ -423,7 +452,7 @@ Evaluate and provide JSON response.""",
     def p6_pr(self):
         self.log("PR desc"); self.state.current_phase=5
         w = self.state.managers[self.state.winner]
-        r = self.run_oc(f"""Original task: {self.user_prompt}
+        r, error = self.run_oc(f"""Original task: {self.user_prompt}
 
 Winning implementation: Manager {self.state.winner.upper()}
 Score: {w.score}/100
@@ -436,6 +465,8 @@ Generate PR description.""",
         if r:
             (w.worktree / "PR_DESCRIPTION.md").write_text(r.get("response",""))
             self.log("PR done", lvl="SUCCESS")
+        elif error:
+            self.log(f"PR generation failed: {error[:200]}", lvl="ERROR")
         self.state.phase_progress[5]=100
     
     def run(self):
