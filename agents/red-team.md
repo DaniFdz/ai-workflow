@@ -2,7 +2,7 @@
 description: Quality assurance specialist - creates tests and validates code when invoked by manager
 mode: subagent
 hidden: false
-model: anthropic/claude-sonnet-4-20250514
+model: openai/gpt-5-codex
 temperature: 0.3
 tools:
   write: true

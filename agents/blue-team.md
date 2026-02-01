@@ -2,7 +2,7 @@
 description: Implementation specialist - writes production-quality code when invoked by manager
 mode: subagent
 hidden: false
-model: anthropic/claude-sonnet-4-20250514
+model: anthropic/claude-opus-4-5
 temperature: 0.3
 tools:
   write: true

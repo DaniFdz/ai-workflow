@@ -53,7 +53,7 @@ class MiniDaniRetry:
         if not self.opencode.exists(): raise FileNotFoundError("OpenCode not found")
         
         # Load agent configurations (model + timeout per agent)
-        agents_config_path = Path(__file__).parent / ".opencode" / "agents.json"
+        agents_config_path = Path(__file__).parent / "agents.json"
         if agents_config_path.exists():
             self.agents_config = json.loads(agents_config_path.read_text())
         else:
@@ -180,7 +180,7 @@ class MiniDaniRetry:
             
             # If agent is specified, prepend agent instructions to prompt
             if agent:
-                agent_path = Path(__file__).parent / ".opencode" / "agents" / f"{agent}.md"
+                agent_path = Path(__file__).parent / "agents" / f"{agent}.md"
                 if agent_path.exists():
                     agent_prompt = agent_path.read_text()
                     p = f"{agent_prompt}\n\n---\n\n{p}"
