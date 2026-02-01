@@ -3,7 +3,7 @@
 MiniDani with Retry Logic - If all scores < 80, launch second round
 """
 
-import subprocess, json, time, threading, sys
+import subprocess, json, time, threading, sys, tempfile
 from pathlib import Path
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -53,10 +53,23 @@ class MiniDaniRetry:
         if not self.opencode.exists(): raise FileNotFoundError("OpenCode not found")
         
         # Load agent configurations (model + timeout per agent)
-        agents_config_path = Path(__file__).parent / "agents.json"
-        if agents_config_path.exists():
+        # Try: 1) current directory, 2) script directory
+        self.script_dir = Path(__file__).parent.resolve()
+        agents_config_candidates = [
+            Path.cwd() / "agents.json",
+            self.script_dir / "agents.json"
+        ]
+        
+        agents_config_path = None
+        for candidate in agents_config_candidates:
+            if candidate.exists():
+                agents_config_path = candidate
+                break
+        
+        if agents_config_path:
             self.agents_config = json.loads(agents_config_path.read_text())
         else:
+            # Fallback defaults
             self.agents_config = {"_default": {"model": "anthropic/claude-opus-4-5", "timeout": 300}}
         self.state = SystemState(
             prompt=user_prompt, 
@@ -180,18 +193,29 @@ class MiniDaniRetry:
             
             # If agent is specified, prepend agent instructions to prompt
             if agent:
-                agent_path = Path(__file__).parent / "agents" / f"{agent}.md"
-                if agent_path.exists():
+                # Try: 1) current directory, 2) script directory
+                agent_candidates = [
+                    Path.cwd() / "agents" / f"{agent}.md",
+                    self.script_dir / "agents" / f"{agent}.md"
+                ]
+                
+                agent_path = None
+                for candidate in agent_candidates:
+                    if candidate.exists():
+                        agent_path = candidate
+                        break
+                
+                if agent_path:
                     agent_prompt = agent_path.read_text()
                     p = f"{agent_prompt}\n\n---\n\n{p}"
             
-            # Build command: opencode run --format json --model <model> [--session <id>] <prompt>
+            # Build command: opencode run --format json --model <model> [--session <id>]
             cmd = [str(self.opencode), "run", "--format", "json", "--model", model]
             if c:
                 cmd.extend(["--session", str(c)])
-            cmd.append(p)
             
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+            # Pass prompt via stdin (more reliable for long prompts)
+            r = subprocess.run(cmd, input=p, capture_output=True, text=True, timeout=timeout)
             
             if r.returncode == 0:
                 return json.loads(r.stdout), None
