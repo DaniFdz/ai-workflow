@@ -185,16 +185,16 @@ minidani "Create hello.py that prints hello world"
 ```
 User Prompt
     ↓
-[Phase 1] Generate branch name → feature/oauth-auth
+[Phase 1] Generate branch name → oauth-auth (or feat/oauth-auth with prefix)
           ⏱️  20s approval window (auto-accept if no response)
-          ✅ Y = Accept | ❌ n = Custom | feature/name = Direct input
+          ✅ Y = Accept | ❌ n = Custom | any-name = Direct input
     ↓
 [Phase 2] Create 3 git worktrees (isolated workspaces)
     ↓
 [Phase 3] Run 3 Managers in parallel threads:
-          Manager A: feature/oauth-auth-r1-a
-          Manager B: feature/oauth-auth-r1-b  
-          Manager C: feature/oauth-auth-r1-c
+          Manager A: oauth-auth-r1-a (or feat/oauth-auth-r1-a with prefix)
+          Manager B: oauth-auth-r1-b  
+          Manager C: oauth-auth-r1-c
     ↓
 [Phase 4] Judge evaluates all 3:
           A=87, B=95, C=82 → Winner: B
@@ -203,7 +203,7 @@ User Prompt
     ↓
 [Phase 6] Generate PR description from winner
     ↓
-✅ Ready to merge feature/oauth-auth-r1-b
+✅ Ready to merge oauth-auth-r1-b
 ```
 
 ### Retry Logic (Automatic Quality Assurance)
@@ -237,7 +237,7 @@ Each agent has detailed instructions, best practices, and evaluation criteria.
 
 ## Branch Prefix Configuration
 
-MiniDani allows you to customize the branch prefix used for generated branch names. By default, it uses `feature/`, but you can configure it for your team's conventions.
+MiniDani allows you to customize the branch prefix used for generated branch names. **By default, no prefix is used** unless you configure one.
 
 ### Priority Order
 
@@ -245,7 +245,7 @@ Branch prefix is determined in this order:
 
 1. **CLI argument** (`--branch-prefix`)
 2. **Environment variable** (`$BRANCH_PREFIX`)
-3. **Default** (`feature/`)
+3. **No prefix** (empty string)
 
 ### Using Environment Variable
 
@@ -262,12 +262,14 @@ minidani "Add authentication"
 
 **Common prefixes:**
 ```bash
-export BRANCH_PREFIX="feature/"   # Default, conventional
+export BRANCH_PREFIX="feature/"   # Conventional commits style
 export BRANCH_PREFIX="feat/"      # Short conventional
 export BRANCH_PREFIX="bugfix/"    # For bug fixes
 export BRANCH_PREFIX="fix/"       # Short bug fix
 export BRANCH_PREFIX="chore/"     # For maintenance
-export BRANCH_PREFIX=""           # No prefix at all
+
+# No need to set BRANCH_PREFIX="" - that's the default
+# Just don't set the variable at all for no prefix
 ```
 
 ### Using CLI Argument
@@ -283,9 +285,13 @@ minidani --branch-prefix "fix/" "Fix login bug"
 minidani --branch-prefix "experiment/" "Try new approach"
 # → Generated: experiment/new-approach
 
-# No prefix at all
+# Explicitly no prefix (same as default behavior)
 minidani --branch-prefix "" "Hotfix for production"
-# → Generated: hotfix-production (no prefix)
+# → Generated: hotfix-production
+
+# Or just don't set any prefix (default)
+minidani "Hotfix for production"
+# → Generated: hotfix-production (no prefix by default)
 ```
 
 ### Team Conventions
@@ -340,9 +346,21 @@ After MiniDani generates a branch name, you have **20 seconds** to approve or cu
 
 ### Interactive Prompt
 
+**Without prefix (default):**
 ```bash
 ==================================================
-🌿 Proposed branch name: feature/oauth-jwt-auth
+🌿 Proposed branch name: oauth-jwt-auth
+   (no prefix configured)
+==================================================
+Approve? [Y/n/custom name]: 
+(Auto-accept in 20s if no response)
+```
+
+**With prefix (e.g., `export BRANCH_PREFIX="feat/"`):**
+```bash
+==================================================
+🌿 Proposed branch name: feat/oauth-jwt-auth
+   (using prefix: feat/)
 ==================================================
 Approve? [Y/n/custom name]: 
 (Auto-accept in 20s if no response)
@@ -352,10 +370,10 @@ Approve? [Y/n/custom name]:
 
 | Input | Action | Example |
 |-------|--------|---------|
-| **Y** or **yes** or **Enter** | Accept proposed name | `feature/oauth-jwt-auth` |
-| **n** or **no** | Prompt for custom entry | You provide: `my-auth` or `feature/my-auth` |
-| **Any text** | Direct custom name | `my-custom-branch` (no prefix required) |
-| *No response (20s)* | Auto-accept | `feature/oauth-jwt-auth` |
+| **Y** or **yes** or **Enter** | Accept proposed name | `oauth-jwt-auth` (or `feat/oauth-jwt-auth` with prefix) |
+| **n** or **no** | Prompt for custom entry | You provide: `my-auth` or `feat/my-auth` |
+| **Any text** | Direct custom name | `my-custom-branch` (any format accepted) |
+| *No response (20s)* | Auto-accept | `oauth-jwt-auth` |
 
 ### Examples
 

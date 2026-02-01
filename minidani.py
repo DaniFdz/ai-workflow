@@ -43,7 +43,7 @@ class SystemState:
     winner: Optional[str] = None
 
 class MiniDaniRetry:
-    def __init__(self, repo_path: Path, user_prompt: str, branch_prefix: str = "feature/"):
+    def __init__(self, repo_path: Path, user_prompt: str, branch_prefix: str = ""):
         self.repo_path, self.user_prompt = repo_path, user_prompt
         self.branch_prefix = branch_prefix
         self.opencode = Path.home() / ".opencode" / "bin" / "opencode"
@@ -167,10 +167,16 @@ class MiniDaniRetry:
         self.log("Gen branch"); self.state.current_phase=0
         
         # Ask branch-namer agent to generate with configured prefix
-        prompt = f"""Branch prefix to use: {self.branch_prefix}
+        if self.branch_prefix:
+            prompt = f"""Branch prefix to use: {self.branch_prefix}
 Task description: {self.user_prompt}
 
 Generate a branch name using the prefix '{self.branch_prefix}' followed by a concise description."""
+        else:
+            prompt = f"""No prefix required - generate simple branch name.
+Task description: {self.user_prompt}
+
+Generate a concise branch name (no prefix, just description in kebab-case)."""
         
         r = self.run_oc(prompt, self.repo_path, agent="branch-namer")
         bn = f"{self.branch_prefix}task"  # Fallback
@@ -187,7 +193,10 @@ Generate a branch name using the prefix '{self.branch_prefix}' followed by a con
         # Pause TUI for user confirmation
         print("\n" + "="*70)
         print(f"🌿 Proposed branch name: {bn}")
-        print(f"   (using prefix: {self.branch_prefix})")
+        if self.branch_prefix:
+            print(f"   (using prefix: {self.branch_prefix})")
+        else:
+            print(f"   (no prefix configured)")
         print("="*70)
         
         response, timed_out = self.get_input_with_timeout(
@@ -203,7 +212,8 @@ Generate a branch name using the prefix '{self.branch_prefix}' followed by a con
             self.log(f"Branch (approved): {bn}", lvl="SUCCESS")
         elif response.lower() in ['n', 'no']:
             # Prompt for custom name
-            print(f"Enter custom branch name (e.g., {self.branch_prefix}my-feature or my-custom-name): ", end='', flush=True)
+            example = f"{self.branch_prefix}my-feature" if self.branch_prefix else "my-custom-branch"
+            print(f"Enter custom branch name (e.g., {example}): ", end='', flush=True)
             custom = sys.stdin.readline().strip()
             if self._validate_branch_name(custom):
                 bn = custom
@@ -511,7 +521,7 @@ Examples:
         "--branch-prefix",
         type=str,
         default=None,
-        help="Branch prefix (e.g., 'feature/', 'feat/', 'bugfix/'). Defaults to $BRANCH_PREFIX env var or 'feature/'"
+        help="Branch prefix (e.g., 'feature/', 'feat/', 'bugfix/'). Defaults to $BRANCH_PREFIX env var or no prefix"
     )
     
     args = parser.parse_args()
@@ -540,10 +550,10 @@ Examples:
         print("Error: Empty prompt")
         sys.exit(1)
     
-    # Determine branch prefix (priority: CLI arg > env var > default)
+    # Determine branch prefix (priority: CLI arg > env var > none)
     branch_prefix = args.branch_prefix
     if branch_prefix is None:
-        branch_prefix = os.getenv("BRANCH_PREFIX", "feature/")
+        branch_prefix = os.getenv("BRANCH_PREFIX", "")
     
     # Ensure prefix ends with / if not empty
     if branch_prefix and not branch_prefix.endswith("/"):
