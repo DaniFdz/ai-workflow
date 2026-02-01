@@ -65,38 +65,30 @@ deactivate
 echo -e "  ${GREEN}✅ Dependencies installed${NC}"
 echo ""
 
-# Step 3: Setup OpenCode agents
-echo -e "${BOLD}[3/5] Setting up OpenCode agents...${NC}"
+# Step 3: Verify agents directory
+echo -e "${BOLD}[3/4] Verifying agents...${NC}"
 
-OPENCODE_DIR="$HOME/.config/opencode"
-AGENTS_SOURCE="$SCRIPT_DIR/agents"
-AGENTS_DEST="$OPENCODE_DIR/agents"
+AGENTS_DIR="$SCRIPT_DIR/agents"
 
-# Create .opencode directory if it doesn't exist
-mkdir -p "$OPENCODE_DIR"
-
-# Backup existing agents directory if present
-if [ -d "$AGENTS_DEST" ]; then
-    BACKUP_PATH="${AGENTS_DEST}.backup.$(date +%s)"
-    echo -e "  ${YELLOW}⚠️  Backing up existing agents to: $(basename $BACKUP_PATH)${NC}"
-    mv "$AGENTS_DEST" "$BACKUP_PATH"
-fi
-
-# Copy agents directory
-cp -r "$AGENTS_SOURCE" "$AGENTS_DEST"
-
-if [ -d "$AGENTS_DEST" ]; then
-    AGENT_COUNT=$(ls -1 "$AGENTS_DEST" | grep -c '\.md$')
-    echo -e "  ${GREEN}✅ Agents installed to ~/.config/opencode/agents/ ($AGENT_COUNT agents)${NC}"
-    echo -e "  ${BLUE}📝 Available: manager, blue-team, red-team, judge, branch-namer, pr-creator${NC}"
-else
-    echo -e "  ${RED}❌ Failed to copy agents${NC}"
+if [ ! -d "$AGENTS_DIR" ]; then
+    echo -e "  ${RED}❌ agents/ directory not found${NC}"
     exit 1
 fi
+
+AGENT_COUNT=$(ls -1 "$AGENTS_DIR" | grep -c '\.md$')
+echo -e "  ${GREEN}✅ Found $AGENT_COUNT agent prompts in agents/${NC}"
+echo -e "  ${BLUE}📝 Available: manager, blue-team, red-team, judge, branch-namer, pr-creator${NC}"
+
+if [ ! -f "$SCRIPT_DIR/agents.json" ]; then
+    echo -e "  ${RED}❌ agents.json not found${NC}"
+    exit 1
+fi
+
+echo -e "  ${GREEN}✅ agents.json configuration found${NC}"
 echo ""
 
 # Step 4: Find installation directory
-echo -e "${BOLD}[4/5] Finding installation directory...${NC}"
+echo -e "${BOLD}[4/4] Finding installation directory...${NC}"
 
 POSSIBLE_BINS=(
     "$HOME/.local/bin"
@@ -138,8 +130,8 @@ if [ -z "$INSTALL_DIR" ]; then
     echo ""
 fi
 
-# Step 5: Create wrapper script
-echo -e "${BOLD}[5/5] Creating wrapper script...${NC}"
+# Create wrapper script
+echo -e "${BOLD}Creating wrapper script...${NC}"
 
 WRAPPER_PATH="$INSTALL_DIR/minidani"
 
@@ -177,10 +169,10 @@ echo ""
 echo "  # From stdin"
 echo "  cat prompt.md | minidani"
 echo ""
-echo -e "${BOLD}OpenCode agents:${NC}"
-echo "  Agents installed to ~/.config/opencode/agents/"
-echo "  Any OpenCode project can use: @manager, @blue-team, @red-team, etc."
-echo "  To update agents, run: ./install.sh again"
+echo -e "${BOLD}Configuration:${NC}"
+echo "  Agents: $SCRIPT_DIR/agents/"
+echo "  Models: $SCRIPT_DIR/agents.json"
+echo "  Customize model/timeout per agent by editing agents.json"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
