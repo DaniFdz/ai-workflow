@@ -1,0 +1,37 @@
+{
+  "branch-namer": {
+    "model": "openai/gpt-4o-mini",
+    "timeout": 30,
+    "description": "Fast & cheap for simple branch naming"
+  },
+  "manager": {
+    "model": "anthropic/claude-opus-4-5",
+    "timeout": 1800,
+    "description": "High quality code generation for main implementation"
+  },
+  "judge": {
+    "model": "anthropic/claude-opus-4-5",
+    "timeout": 480,
+    "description": "Accurate evaluation and scoring"
+  },
+  "pr-creator": {
+    "model": "anthropic/claude-opus-4-5",
+    "timeout": 300,
+    "description": "Generate comprehensive PR descriptions"
+  },
+  "red-team": {
+    "model": "openai/gpt-5-codex",
+    "timeout": 1800,
+    "description": "Pure code generation specialist (not yet implemented)"
+  },
+  "blue-team": {
+    "model": "anthropic/claude-opus-4-5",
+    "timeout": 1200,
+    "description": "Quality assurance and testing (not yet implemented)"
+  },
+  "_default": {
+    "model": "anthropic/claude-opus-4-5",
+    "timeout": 300,
+    "description": "Fallback for agents without specific config"
+  }
+}

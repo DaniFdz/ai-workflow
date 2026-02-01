@@ -51,6 +51,13 @@ class MiniDaniRetry:
         self.opencode = Path.home() / ".opencode" / "bin" / "opencode"
         self.console, self.lock = Console(), threading.Lock()
         if not self.opencode.exists(): raise FileNotFoundError("OpenCode not found")
+        
+        # Load agent configurations (model + timeout per agent)
+        agents_config_path = Path(__file__).parent / ".opencode" / "agents.json"
+        if agents_config_path.exists():
+            self.agents_config = json.loads(agents_config_path.read_text())
+        else:
+            self.agents_config = {"_default": {"model": "anthropic/claude-opus-4-5", "timeout": 300}}
         self.state = SystemState(
             prompt=user_prompt, 
             repo_path=repo_path, 
@@ -153,9 +160,24 @@ class MiniDaniRetry:
             # Fallback for Windows - no timeout support
             return input().strip(), False
     
-    def run_oc(self, p, c=None, t=300, agent=None, model=None):
-        """Run OpenCode with optional agent system prompt. Returns (result, error_msg)"""
+    def run_oc(self, p, c=None, t=None, agent=None, model=None):
+        """Run OpenCode with optional agent system prompt. Returns (result, error_msg)
+        
+        Args:
+            p: Prompt text
+            c: Session/context path
+            t: Timeout (overrides agent config if provided)
+            agent: Agent name (loads config from agents.json)
+            model: Model override (overrides agent config if provided)
+        """
         try:
+            # Get agent config (model + timeout) from agents.json
+            agent_cfg = self.agents_config.get(agent, self.agents_config.get("_default", {}))
+            
+            # Use explicit params or fall back to agent config
+            model = model or agent_cfg.get("model", "anthropic/claude-opus-4-5")
+            timeout = t if t is not None else agent_cfg.get("timeout", 300)
+            
             # If agent is specified, prepend agent instructions to prompt
             if agent:
                 agent_path = Path(__file__).parent / ".opencode" / "agents" / f"{agent}.md"
@@ -164,14 +186,12 @@ class MiniDaniRetry:
                     p = f"{agent_prompt}\n\n---\n\n{p}"
             
             # Build command: opencode run --format json --model <model> [--session <id>] <prompt>
-            # Use provided model or default to claude-opus-4-5
-            model = model or "anthropic/claude-opus-4-5"
             cmd = [str(self.opencode), "run", "--format", "json", "--model", model]
             if c:
                 cmd.extend(["--session", str(c)])
             cmd.append(p)
             
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=t)
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
             
             if r.returncode == 0:
                 return json.loads(r.stdout), None
@@ -205,8 +225,8 @@ Task description: {self.user_prompt}
 
 Generate a concise branch name (no prefix, just description in kebab-case)."""
         
-        # Use fast model (gpt-4o-mini) with short timeout for simple branch naming
-        r, error = self.run_oc(prompt, self.repo_path, t=30, agent="branch-namer", model="openai/gpt-4o-mini")
+        # Model and timeout configured in agents.json
+        r, error = self.run_oc(prompt, self.repo_path, agent="branch-namer")
         bn = f"{self.branch_prefix}task"  # Fallback
         
         if r:
@@ -335,9 +355,9 @@ Generate a concise branch name (no prefix, just description in kebab-case)."""
         
         try:
             m.phase, m.last_activity, m.iteration = "Impl", "Working...", 1
-            # Timeout: 20 min base + 10 min per iteration (30 min for iteration 1)
+            # Timeout configured in agents.json (30 min for manager)
             r, error = self.run_oc(f"User task:\n{self.user_prompt}{feedback}", 
-                          m.worktree, t=1800, agent="manager")
+                          m.worktree, agent="manager")
             if r:
                 m.summary, m.status, m.last_activity = r.get("response","")[:500], "complete", "Done"
                 subprocess.run(["git","add","."], cwd=m.worktree)
@@ -385,7 +405,7 @@ Manager C Summary:
 {self.state.managers['c'].summary[:200] if self.state.managers['c'].status=='complete' else 'FAILED'}
 
 Evaluate and provide JSON response.""", 
-                       self.repo_path, t=480, agent="judge")
+                       self.repo_path, agent="judge")
         
         if r:
             try:
@@ -469,7 +489,7 @@ Round: {w.round}
 Summary: {w.summary}
 
 Generate PR description.""", 
-                       self.repo_path, t=300, agent="pr-creator")
+                       self.repo_path, agent="pr-creator")
         if r:
             (w.worktree / "PR_DESCRIPTION.md").write_text(r.get("response",""))
             self.log("PR done", lvl="SUCCESS")
