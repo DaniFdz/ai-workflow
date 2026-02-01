@@ -164,8 +164,8 @@ class MiniDaniRetry:
                     p = f"{agent_prompt}\n\n---\n\n{p}"
             
             # Build command: opencode run --format json --model <model> [--session <id>] <prompt>
-            # Use provided model or default to claude-sonnet-4
-            model = model or "anthropic/claude-sonnet-4"
+            # Use provided model or default to claude-opus-4-5
+            model = model or "anthropic/claude-opus-4-5"
             cmd = [str(self.opencode), "run", "--format", "json", "--model", model]
             if c:
                 cmd.extend(["--session", str(c)])
