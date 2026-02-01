@@ -12,6 +12,7 @@ MiniDani runs 3 AI coding agents in parallel competing to implement your feature
 - [Quick Start](#quick-start)
 - [Installation](#installation)
 - [How It Works](#how-it-works)
+- [Branch Prefix Configuration](#branch-prefix-configuration)
 - [Branch Name Approval](#branch-name-approval)
 - [Judging Criteria](#judging-criteria)
 - [Live TUI Interface](#live-tui-interface)
@@ -234,6 +235,105 @@ Each agent has detailed instructions, best practices, and evaluation criteria.
 
 ---
 
+## Branch Prefix Configuration
+
+MiniDani allows you to customize the branch prefix used for generated branch names. By default, it uses `feature/`, but you can configure it for your team's conventions.
+
+### Priority Order
+
+Branch prefix is determined in this order:
+
+1. **CLI argument** (`--branch-prefix`)
+2. **Environment variable** (`$BRANCH_PREFIX`)
+3. **Default** (`feature/`)
+
+### Using Environment Variable
+
+Set a global default prefix for all runs:
+
+```bash
+# In your ~/.bashrc or ~/.zshrc
+export BRANCH_PREFIX="feat/"
+
+# Now all MiniDani runs use feat/
+minidani "Add authentication"
+# → Generated: feat/auth or feat/add-auth
+```
+
+**Common prefixes:**
+```bash
+export BRANCH_PREFIX="feature/"   # Default, conventional
+export BRANCH_PREFIX="feat/"      # Short conventional
+export BRANCH_PREFIX="bugfix/"    # For bug fixes
+export BRANCH_PREFIX="fix/"       # Short bug fix
+export BRANCH_PREFIX="chore/"     # For maintenance
+export BRANCH_PREFIX=""           # No prefix at all
+```
+
+### Using CLI Argument
+
+Override the prefix for a single run:
+
+```bash
+# Override env var or default
+minidani --branch-prefix "fix/" "Fix login bug"
+# → Generated: fix/login-bug
+
+# Use a custom prefix
+minidani --branch-prefix "experiment/" "Try new approach"
+# → Generated: experiment/new-approach
+
+# No prefix at all
+minidani --branch-prefix "" "Hotfix for production"
+# → Generated: hotfix-production (no prefix)
+```
+
+### Team Conventions
+
+**Example 1: Jira ticket integration**
+```bash
+export BRANCH_PREFIX="PROJ-123/"
+minidani "Add OAuth"
+# → Generated: PROJ-123/oauth-auth
+```
+
+**Example 2: Developer name prefixes**
+```bash
+export BRANCH_PREFIX="john/"
+minidani "Refactor database"
+# → Generated: john/refactor-db
+```
+
+**Example 3: GitFlow style**
+```bash
+# Features
+export BRANCH_PREFIX="feature/"
+minidani "New API"  # → feature/new-api
+
+# Hotfixes
+minidani --branch-prefix "hotfix/" "Critical bug"  # → hotfix/critical-bug
+```
+
+### Custom Branch Names (No Prefix Required)
+
+When you provide a **custom branch name** manually during approval, you don't need to include the configured prefix:
+
+```bash
+$ minidani "Add authentication"
+
+🌿 Proposed branch name: feature/add-auth
+   (using prefix: feature/)
+Approve? [Y/n/custom name]: my-custom-branch↵
+
+✅ Using custom branch: my-custom-branch
+```
+
+**The prefix is only used for AI-generated names**, not for your manual input. You have complete freedom when entering custom names.
+
+[↑ Back to top](#table-of-contents)
+
+---
+
 ## Branch Name Approval
 
 After MiniDani generates a branch name, you have **20 seconds** to approve or customize it:
@@ -253,8 +353,8 @@ Approve? [Y/n/custom name]:
 | Input | Action | Example |
 |-------|--------|---------|
 | **Y** or **yes** or **Enter** | Accept proposed name | `feature/oauth-jwt-auth` |
-| **n** or **no** | Prompt for custom entry | You provide: `feature/my-auth` |
-| **feature/...** | Direct custom name | `feature/custom-name` |
+| **n** or **no** | Prompt for custom entry | You provide: `my-auth` or `feature/my-auth` |
+| **Any text** | Direct custom name | `my-custom-branch` (no prefix required) |
 | *No response (20s)* | Auto-accept | `feature/oauth-jwt-auth` |
 
 ### Examples
@@ -268,14 +368,20 @@ Approve? [Y/n/custom name]: y
 **Reject and provide custom:**
 ```bash
 Approve? [Y/n/custom name]: n
-Enter custom branch name: feature/my-oauth
-✅ Using custom branch: feature/my-oauth
+Enter custom branch name: my-oauth-implementation
+✅ Using custom branch: my-oauth-implementation
 ```
 
-**Direct custom name:**
+**Direct custom name (no prefix required):**
 ```bash
-Approve? [Y/n/custom name]: feature/awesome-auth
-✅ Using custom branch: feature/awesome-auth
+Approve? [Y/n/custom name]: awesome-auth-v2
+✅ Using custom branch: awesome-auth-v2
+```
+
+**Custom name with your own prefix:**
+```bash
+Approve? [Y/n/custom name]: experimental/new-approach
+✅ Using custom branch: experimental/new-approach
 ```
 
 **Auto-accept (timeout):**
@@ -284,7 +390,7 @@ Approve? [Y/n/custom name]:
 ⏱️  Timeout - auto-accepting branch name
 ```
 
-**Why this matters:** Branch names become part of your git history and are visible in PRs, so having control over naming ensures consistency with your team's conventions.
+**Why this matters:** Branch names become part of your git history and are visible in PRs. With configurable prefixes and manual override, you maintain consistency with your team's conventions while having full flexibility when needed.
 
 [↑ Back to top](#table-of-contents)
 

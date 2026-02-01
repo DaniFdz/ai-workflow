@@ -43,8 +43,9 @@ class SystemState:
     winner: Optional[str] = None
 
 class MiniDaniRetry:
-    def __init__(self, repo_path: Path, user_prompt: str):
+    def __init__(self, repo_path: Path, user_prompt: str, branch_prefix: str = "feature/"):
         self.repo_path, self.user_prompt = repo_path, user_prompt
+        self.branch_prefix = branch_prefix
         self.opencode = Path.home() / ".opencode" / "bin" / "opencode"
         self.console, self.lock = Console(), threading.Lock()
         if not self.opencode.exists(): raise FileNotFoundError("OpenCode not found")
@@ -164,15 +165,29 @@ class MiniDaniRetry:
         if self.state.branch_base:  # Already have branch from round 1
             return
         self.log("Gen branch"); self.state.current_phase=0
-        r = self.run_oc(f"Task description:\n{self.user_prompt}", self.repo_path, agent="branch-namer")
-        bn = "feature/task"
+        
+        # Ask branch-namer agent to generate with configured prefix
+        prompt = f"""Branch prefix to use: {self.branch_prefix}
+Task description: {self.user_prompt}
+
+Generate a branch name using the prefix '{self.branch_prefix}' followed by a concise description."""
+        
+        r = self.run_oc(prompt, self.repo_path, agent="branch-namer")
+        bn = f"{self.branch_prefix}task"  # Fallback
+        
         if r:
-            for l in r.get("response","").split("\n"):
-                if l.strip().startswith("feature/") and len(l)<50: bn=l.strip(); break
+            response_text = r.get("response", "")
+            for line in response_text.split("\n"):
+                line = line.strip()
+                # Accept any line that starts with the configured prefix
+                if line.startswith(self.branch_prefix) and len(line) < 50:
+                    bn = line
+                    break
         
         # Pause TUI for user confirmation
         print("\n" + "="*70)
         print(f"🌿 Proposed branch name: {bn}")
+        print(f"   (using prefix: {self.branch_prefix})")
         print("="*70)
         
         response, timed_out = self.get_input_with_timeout(
@@ -188,29 +203,37 @@ class MiniDaniRetry:
             self.log(f"Branch (approved): {bn}", lvl="SUCCESS")
         elif response.lower() in ['n', 'no']:
             # Prompt for custom name
-            print("Enter custom branch name (e.g., feature/my-feature): ", end='', flush=True)
+            print(f"Enter custom branch name (e.g., {self.branch_prefix}my-feature or my-custom-name): ", end='', flush=True)
             custom = sys.stdin.readline().strip()
-            if custom and custom.startswith("feature/"):
+            if self._validate_branch_name(custom):
                 bn = custom
                 print(f"✅ Using custom branch: {bn}")
                 self.log(f"Branch (custom): {bn}", lvl="SUCCESS")
             else:
-                print(f"⚠️  Invalid format, using original: {bn}")
+                print(f"⚠️  Invalid format (spaces/special chars not allowed), using original: {bn}")
                 self.log(f"Branch (fallback): {bn}", lvl="WARNING")
         else:
             # User typed something else - treat as custom branch name
-            if response.startswith("feature/"):
+            if self._validate_branch_name(response):
                 bn = response
                 print(f"✅ Using custom branch: {bn}")
                 self.log(f"Branch (custom): {bn}", lvl="SUCCESS")
             else:
-                print(f"⚠️  Invalid format '{response}', using original: {bn}")
+                print(f"⚠️  Invalid format '{response}' (spaces/special chars not allowed), using original: {bn}")
                 self.log(f"Branch (fallback): {bn}", lvl="WARNING")
         
         print("="*70 + "\n")
         self.state.branch_base = bn
         self.state.phase_progress[0]=100
         time.sleep(1)  # Brief pause before resuming TUI
+    
+    def _validate_branch_name(self, name: str) -> bool:
+        """Validate branch name - allow any format without spaces or special chars"""
+        if not name or len(name) > 100:
+            return False
+        # Git branch names can't have spaces, ~, ^, :, ?, *, [, \
+        invalid_chars = [' ', '~', '^', ':', '?', '*', '[', '\\', '..']
+        return not any(char in name for char in invalid_chars)
     
     def p2_setup(self, round_num: int):
         self.log(f"Setup worktrees (Round {round_num})"); self.state.current_phase=1
@@ -455,16 +478,22 @@ Generate PR description.""",
 
 if __name__ == "__main__":
     import argparse
+    import os
     
     parser = argparse.ArgumentParser(
         description="MiniDani - Competitive AI workflow orchestrator",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  minidani "Create a REST API"              # Inline prompt
-  minidani -f prompt.md                      # From file
-  cat prompt.md | minidani                   # From stdin
-  minidani < prompt.md                       # From stdin redirect
+  minidani "Create a REST API"                      # Inline prompt
+  minidani -f prompt.md                              # From file
+  cat prompt.md | minidani                           # From stdin
+  minidani < prompt.md                               # From stdin redirect
+  
+  # Custom branch prefix
+  minidani --branch-prefix "feat/" "Add auth"        # Use feat/ prefix
+  export BRANCH_PREFIX="bugfix/"                     # Set default prefix
+  minidani "Fix login bug"                           # Uses bugfix/ prefix
         """
     )
     
@@ -477,6 +506,12 @@ Examples:
         "-f", "--file",
         type=Path,
         help="Read prompt from file"
+    )
+    parser.add_argument(
+        "--branch-prefix",
+        type=str,
+        default=None,
+        help="Branch prefix (e.g., 'feature/', 'feat/', 'bugfix/'). Defaults to $BRANCH_PREFIX env var or 'feature/'"
     )
     
     args = parser.parse_args()
@@ -505,10 +540,19 @@ Examples:
         print("Error: Empty prompt")
         sys.exit(1)
     
+    # Determine branch prefix (priority: CLI arg > env var > default)
+    branch_prefix = args.branch_prefix
+    if branch_prefix is None:
+        branch_prefix = os.getenv("BRANCH_PREFIX", "feature/")
+    
+    # Ensure prefix ends with / if not empty
+    if branch_prefix and not branch_prefix.endswith("/"):
+        branch_prefix += "/"
+    
     # Use current working directory as the repository path
     repo_path = Path.cwd()
     
-    minidani = MiniDaniRetry(repo_path, prompt)
+    minidani = MiniDaniRetry(repo_path, prompt, branch_prefix=branch_prefix)
     result = minidani.run()
     
     print("\n" + "="*70)
