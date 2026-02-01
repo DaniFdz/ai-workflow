@@ -52,25 +52,16 @@ class MiniDaniRetry:
         self.console, self.lock = Console(), threading.Lock()
         if not self.opencode.exists(): raise FileNotFoundError("OpenCode not found")
         
-        # Load agent configurations (model + timeout per agent)
-        # Try: 1) current directory, 2) script directory
-        self.script_dir = Path(__file__).parent.resolve()
-        agents_config_candidates = [
-            Path.cwd() / "agents.json",
-            self.script_dir / "agents.json"
-        ]
-        
-        agents_config_path = None
-        for candidate in agents_config_candidates:
-            if candidate.exists():
-                agents_config_path = candidate
-                break
-        
-        if agents_config_path:
-            self.agents_config = json.loads(agents_config_path.read_text())
-        else:
-            # Fallback defaults
-            self.agents_config = {"_default": {"model": "anthropic/claude-opus-4-5", "timeout": 300}}
+        # Agent timeouts (models are defined in agent .md frontmatter)
+        self.agent_timeouts = {
+            "branch-namer": 30,
+            "manager": 1800,
+            "judge": 480,
+            "pr-creator": 300,
+            "red-team": 1800,
+            "blue-team": 1200,
+            "_default": 300
+        }
         self.state = SystemState(
             prompt=user_prompt, 
             repo_path=repo_path, 
@@ -173,46 +164,29 @@ class MiniDaniRetry:
             # Fallback for Windows - no timeout support
             return input().strip(), False
     
-    def run_oc(self, p, c=None, t=None, agent=None, model=None):
-        """Run OpenCode with optional agent system prompt. Returns (result, error_msg)
+    def run_oc(self, p, c=None, t=None, agent=None):
+        """Run OpenCode with optional agent. Returns (result, error_msg)
         
         Args:
             p: Prompt text
-            c: Session/context path
-            t: Timeout (overrides agent config if provided)
-            agent: Agent name (loads config from agents.json)
-            model: Model override (overrides agent config if provided)
+            c: Session/context path (for continuation)
+            t: Timeout (overrides default if provided)
+            agent: Agent name (uses OpenCode's --agent flag)
         """
         try:
-            # Get agent config (model + timeout) from agents.json
-            agent_cfg = self.agents_config.get(agent, self.agents_config.get("_default", {}))
+            # Get timeout for agent
+            timeout = t if t is not None else self.agent_timeouts.get(agent, 300)
             
-            # Use explicit params or fall back to agent config
-            model = model or agent_cfg.get("model", "anthropic/claude-opus-4-5")
-            timeout = t if t is not None else agent_cfg.get("timeout", 300)
+            # Build command: opencode run --format json [--agent <name>] [<cwd>]
+            cmd = [str(self.opencode), "run", "--format", "json"]
             
-            # If agent is specified, prepend agent instructions to prompt
+            # Use agent if specified (OpenCode loads agent from ~/.config/opencode/agents/)
             if agent:
-                # Try: 1) current directory, 2) script directory
-                agent_candidates = [
-                    Path.cwd() / "agents" / f"{agent}.md",
-                    self.script_dir / "agents" / f"{agent}.md"
-                ]
-                
-                agent_path = None
-                for candidate in agent_candidates:
-                    if candidate.exists():
-                        agent_path = candidate
-                        break
-                
-                if agent_path:
-                    agent_prompt = agent_path.read_text()
-                    p = f"{agent_prompt}\n\n---\n\n{p}"
+                cmd.extend(["--agent", agent])
             
-            # Build command: opencode run --format json --model <model> [--session <id>]
-            cmd = [str(self.opencode), "run", "--format", "json", "--model", model]
+            # Add working directory (context) if provided
             if c:
-                cmd.extend(["--session", str(c)])
+                cmd.append(str(c))
             
             # Pass prompt via stdin (more reliable for long prompts)
             r = subprocess.run(cmd, input=p, capture_output=True, text=True, timeout=timeout)

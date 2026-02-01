@@ -65,30 +65,42 @@ deactivate
 echo -e "  ${GREEN}✅ Dependencies installed${NC}"
 echo ""
 
-# Step 3: Verify agents directory
-echo -e "${BOLD}[3/4] Verifying agents...${NC}"
+# Step 3: Install agents for OpenCode
+echo -e "${BOLD}[3/5] Installing agents for OpenCode...${NC}"
 
-AGENTS_DIR="$SCRIPT_DIR/agents"
+AGENTS_SOURCE="$SCRIPT_DIR/agents"
+AGENTS_DEST="$HOME/.config/opencode/agents"
 
-if [ ! -d "$AGENTS_DIR" ]; then
+if [ ! -d "$AGENTS_SOURCE" ]; then
     echo -e "  ${RED}❌ agents/ directory not found${NC}"
     exit 1
 fi
 
-AGENT_COUNT=$(ls -1 "$AGENTS_DIR" | grep -c '\.md$')
-echo -e "  ${GREEN}✅ Found $AGENT_COUNT agent prompts in agents/${NC}"
-echo -e "  ${BLUE}📝 Available: manager, blue-team, red-team, judge, branch-namer, pr-creator${NC}"
+# Create .config/opencode if it doesn't exist
+mkdir -p "$HOME/.config/opencode"
 
-if [ ! -f "$SCRIPT_DIR/agents.json" ]; then
-    echo -e "  ${RED}❌ agents.json not found${NC}"
-    exit 1
+# Backup existing agents if present
+if [ -d "$AGENTS_DEST" ]; then
+    BACKUP_PATH="${AGENTS_DEST}.backup.$(date +%s)"
+    echo -e "  ${YELLOW}⚠️  Backing up existing agents to: $(basename $BACKUP_PATH)${NC}"
+    mv "$AGENTS_DEST" "$BACKUP_PATH"
 fi
 
-echo -e "  ${GREEN}✅ agents.json configuration found${NC}"
+# Copy agents
+cp -r "$AGENTS_SOURCE" "$AGENTS_DEST"
+AGENT_COUNT=$(ls -1 "$AGENTS_DEST" | grep -c '\.md$')
+
+if [ $AGENT_COUNT -gt 0 ]; then
+    echo -e "  ${GREEN}✅ Installed $AGENT_COUNT agents to ~/.config/opencode/agents/${NC}"
+    echo -e "  ${BLUE}📝 Available: manager, blue-team, red-team, judge, branch-namer, pr-creator${NC}"
+else
+    echo -e "  ${RED}❌ Failed to install agents${NC}"
+    exit 1
+fi
 echo ""
 
 # Step 4: Find installation directory
-echo -e "${BOLD}[4/4] Finding installation directory...${NC}"
+echo -e "${BOLD}[4/5] Finding installation directory...${NC}"
 
 POSSIBLE_BINS=(
     "$HOME/.local/bin"
@@ -130,8 +142,8 @@ if [ -z "$INSTALL_DIR" ]; then
     echo ""
 fi
 
-# Create wrapper script
-echo -e "${BOLD}Creating wrapper script...${NC}"
+# Step 5: Create wrapper script
+echo -e "${BOLD}[5/5] Creating wrapper script...${NC}"
 
 WRAPPER_PATH="$INSTALL_DIR/minidani"
 
