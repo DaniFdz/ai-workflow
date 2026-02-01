@@ -14,6 +14,7 @@ MiniDani runs 3 AI coding agents in parallel competing to implement your feature
 - [How It Works](#how-it-works)
 - [Branch Prefix Configuration](#branch-prefix-configuration)
 - [Branch Name Approval](#branch-name-approval)
+- [Worktree Naming](#worktree-naming)
 - [Judging Criteria](#judging-criteria)
 - [Live TUI Interface](#live-tui-interface)
 - [Configuration](#configuration)
@@ -409,6 +410,99 @@ Approve? [Y/n/custom name]:
 ```
 
 **Why this matters:** Branch names become part of your git history and are visible in PRs. With configurable prefixes and manual override, you maintain consistency with your team's conventions while having full flexibility when needed.
+
+[↑ Back to top](#table-of-contents)
+
+---
+
+## Worktree Naming
+
+MiniDani creates isolated git worktrees for each competing manager. Understanding the naming scheme helps you locate and manage these directories.
+
+### Naming Scheme
+
+**Pattern:** `<repo_name>_<suffix>_r<round>_<id>`
+
+- **repo_name**: Your repository's directory name
+- **suffix**: Branch name without prefix (part after last `/`)
+- **round**: Round number (1 or 2)
+- **id**: Manager identifier (a, b, or c)
+
+**Location:** `../<worktree_folder>/` (sibling to your repo)
+
+### Examples
+
+#### With Prefix (`export BRANCH_PREFIX="feat/"`)
+
+| Branch Base | Suffix | Branch Git | Worktree Folder | Location |
+|-------------|--------|------------|-----------------|----------|
+| `feat/auth` | `auth` | `feat/auth-r1-a` | `myrepo_auth_r1_a` | `../myrepo_auth_r1_a/` |
+| `feat/auth` | `auth` | `feat/auth-r1-b` | `myrepo_auth_r1_b` | `../myrepo_auth_r1_b/` |
+| `feat/auth` | `auth` | `feat/auth-r1-c` | `myrepo_auth_r1_c` | `../myrepo_auth_r1_c/` |
+
+#### Without Prefix (default)
+
+| Branch Base | Suffix | Branch Git | Worktree Folder | Location |
+|-------------|--------|------------|-----------------|----------|
+| `auth` | `auth` | `auth-r1-a` | `myrepo_auth_r1_a` | `../myrepo_auth_r1_a/` |
+| `auth` | `auth` | `auth-r1-b` | `myrepo_auth_r1_b` | `../myrepo_auth_r1_b/` |
+| `auth` | `auth` | `auth-r1-c` | `myrepo_auth_r1_c` | `../myrepo_auth_r1_c/` |
+
+#### Round 2 (Retry)
+
+| Branch Base | Suffix | Branch Git | Worktree Folder | Location |
+|-------------|--------|------------|-----------------|----------|
+| `feat/auth` | `auth` | `feat/auth-r2-a` | `myrepo_auth_r2_a` | `../myrepo_auth_r2_a/` |
+| `feat/auth` | `auth` | `feat/auth-r2-b` | `myrepo_auth_r2_b` | `../myrepo_auth_r2_b/` |
+| `feat/auth` | `auth` | `feat/auth-r2-c` | `myrepo_auth_r2_c` | `../myrepo_auth_r2_c/` |
+
+### Filesystem Structure
+
+**Before cleanup** (all 3 managers running):
+```
+~/projects/
+├── myrepo/                # Main repo
+│   ├── .git/
+│   └── src/
+├── myrepo_auth_r1_a/      # Manager A worktree
+│   └── src/
+├── myrepo_auth_r1_b/      # Manager B worktree (winner)
+│   └── src/
+└── myrepo_auth_r1_c/      # Manager C worktree
+    └── src/
+```
+
+**After cleanup** (winner selected: B):
+```
+~/projects/
+├── myrepo/                # Main repo
+│   ├── .git/
+│   └── src/
+└── myrepo_auth_r1_b/      # Winner's worktree - ready to merge
+    └── src/
+```
+
+### Key Benefits
+
+✅ **No slashes in folder names** - Avoids filesystem issues
+✅ **Descriptive** - `myrepo_auth_r1_a` is clearer than `myrepo_worktree_r1_a`
+✅ **Consistent** - Same folder name structure with or without prefix
+✅ **Organized** - Easy to identify which worktree belongs to which feature
+
+### Managing Worktrees Manually
+
+If you need to manually manage worktrees:
+
+```bash
+# List all worktrees
+git worktree list
+
+# Remove a specific worktree
+git worktree remove ../myrepo_auth_r1_a --force
+
+# Remove associated branch
+git branch -D auth-r1-a  # or feat/auth-r1-a with prefix
+```
 
 [↑ Back to top](#table-of-contents)
 

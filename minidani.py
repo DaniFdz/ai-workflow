@@ -248,6 +248,10 @@ Generate a concise branch name (no prefix, just description in kebab-case)."""
     def p2_setup(self, round_num: int):
         self.log(f"Setup worktrees (Round {round_num})"); self.state.current_phase=1
         
+        # Extract suffix from branch_base (part after last /)
+        # Examples: "feat/auth" → "auth", "auth" → "auth"
+        suffix = self.state.branch_base.split('/')[-1] if '/' in self.state.branch_base else self.state.branch_base
+        
         # Cleanup previous round if any
         for i, m in enumerate(["a","b","c"]):
             mg = self.state.managers[m]
@@ -255,12 +259,15 @@ Generate a concise branch name (no prefix, just description in kebab-case)."""
                 subprocess.run(["git","worktree","remove",str(mg.worktree),"--force"], 
                              cwd=self.repo_path, stderr=subprocess.DEVNULL)
                 if mg.branch:
-                    subprocess.run(["git","branch","-D",mg.branch], 
+                    subprocess.run(["git","branch","-D",str(mg.branch)], 
                                  cwd=self.repo_path, stderr=subprocess.DEVNULL)
             
             # Create new worktree
+            # Branch name includes full path: prefix/suffix-r1-a or suffix-r1-a
             br = f"{self.state.branch_base}-r{round_num}-{m}"
-            wt = self.repo_path.parent / f"{self.repo_path.name}_worktree_r{round_num}_{m}"
+            
+            # Worktree folder uses only suffix (no prefix): reponame_suffix_r1_a
+            wt = self.repo_path.parent / f"{self.repo_path.name}_{suffix}_r{round_num}_{m}"
             
             subprocess.run(["git","worktree","add",str(wt),"-b",br], 
                          cwd=self.repo_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
