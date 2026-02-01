@@ -320,6 +320,22 @@ Generate PR description.""",
     def run(self):
         layout = self.make_layout()
         
+        # Flag to stop render thread
+        self.running = True
+        
+        def render_loop():
+            """Background thread to update TUI"""
+            while self.running:
+                try:
+                    self.render(layout)
+                    time.sleep(0.25)  # 4 Hz refresh rate
+                except:
+                    pass
+        
+        # Start render thread
+        render_thread = threading.Thread(target=render_loop, daemon=True)
+        render_thread.start()
+        
         with Live(layout, refresh_per_second=4, screen=True, console=self.console):
             try:
                 self.log("MiniDani Starting...")
@@ -359,6 +375,9 @@ Generate PR description.""",
                 el = (datetime.now() - self.state.start_time).total_seconds()
                 self.log(f"Done {el:.1f}s", lvl="SUCCESS")
                 
+                # Stop render thread
+                self.running = False
+                
                 return {
                     "success": True,
                     "winner": self.state.winner,
@@ -369,7 +388,12 @@ Generate PR description.""",
                 }
             except Exception as e:
                 self.log(f"Fatal:{e}", lvl="ERROR"); time.sleep(3)
+                # Stop render thread
+                self.running = False
                 return {"success": False, "error": str(e)}
+            finally:
+                # Ensure render thread stops
+                self.running = False
 
 if __name__ == "__main__":
     import argparse
