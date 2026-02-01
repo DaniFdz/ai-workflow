@@ -662,6 +662,47 @@ This helps diagnose:
 - ✅ Detailed error messages when things fail
 - ✅ Helpful for bug reports with full context
 
+### Practical Debugging Tips
+
+**See all errors in real-time:**
+```bash
+# View all errors as they happen
+minidani -d "task" 2>&1 | grep ERROR
+
+# Save to file for later analysis
+minidani -d "task" 2>&1 | tee debug.log
+```
+
+**Filter errors by manager:**
+```bash
+# See only Manager A errors
+grep "\[MA\].*ERROR" debug.log
+
+# See only Manager B errors
+grep "\[MB\].*ERROR" debug.log
+
+# See only Manager C errors
+grep "\[MC\].*ERROR" debug.log
+```
+
+**Debug workflow:**
+1. Manager fails → Check stderr in debug logs
+2. Identify error cause (timeout, syntax, model issue)
+3. Fix the root problem
+4. Re-run with same prompt
+
+**Common error patterns:**
+```bash
+# Model timeouts
+grep "model timeout" debug.log
+
+# Exit codes (non-zero = failure)
+grep "Exit code [^0]" debug.log
+
+# OpenCode specific errors
+grep "OpenCode error" debug.log
+```
+
 [↑ Back to top](#table-of-contents)
 
 ---
