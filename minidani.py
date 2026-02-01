@@ -43,9 +43,11 @@ class SystemState:
     winner: Optional[str] = None
 
 class MiniDaniRetry:
-    def __init__(self, repo_path: Path, user_prompt: str, branch_prefix: str = ""):
+    def __init__(self, repo_path: Path, user_prompt: str, branch_prefix: str = "", debug: bool = False):
         self.repo_path, self.user_prompt = repo_path, user_prompt
         self.branch_prefix = branch_prefix
+        self.debug = debug
+        self.debug_logs = []  # Accumulate debug logs here
         self.opencode = Path.home() / ".opencode" / "bin" / "opencode"
         self.console, self.lock = Console(), threading.Lock()
         if not self.opencode.exists(): raise FileNotFoundError("OpenCode not found")
@@ -65,6 +67,11 @@ class MiniDaniRetry:
         icons = {"SUCCESS":"✅", "WORKING":"🔄", "JUDGE":"⚖️", "WINNER":"🏆", "WARNING":"⚠️", "INFO":"ℹ️", "ERROR":"❌"}
         with self.lock: 
             self.state.activity_log.append((datetime.now(), mgr, f"{icons.get(lvl,'ℹ️')} {msg}"))
+            
+            # Also log to debug buffer if debug mode enabled
+            if self.debug:
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                self.debug_logs.append(f"[{timestamp}] [{mgr:8s}] [{lvl:7s}] {msg}")
     
     def make_layout(self):
         layout = Layout()
@@ -244,6 +251,22 @@ Generate a concise branch name (no prefix, just description in kebab-case)."""
         # Git branch names can't have spaces, ~, ^, :, ?, *, [, \
         invalid_chars = [' ', '~', '^', ':', '?', '*', '[', '\\', '..']
         return not any(char in name for char in invalid_chars)
+    
+    def print_debug_logs(self):
+        """Print accumulated debug logs at the end of execution"""
+        if not self.debug or not self.debug_logs:
+            return
+        
+        print("\n" + "="*80)
+        print("DEBUG LOGS".center(80))
+        print("="*80)
+        
+        for log_line in self.debug_logs:
+            print(log_line)
+        
+        print("="*80)
+        print(f"Total debug entries: {len(self.debug_logs)}")
+        print("="*80 + "\n")
     
     def p2_setup(self, round_num: int):
         self.log(f"Setup worktrees (Round {round_num})"); self.state.current_phase=1
@@ -476,6 +499,9 @@ Generate PR description.""",
                 # Stop render thread
                 self.running = False
                 
+                # Print debug logs if enabled
+                self.print_debug_logs()
+                
                 return {
                     "success": True,
                     "winner": self.state.winner,
@@ -488,6 +514,10 @@ Generate PR description.""",
                 self.log(f"Fatal:{e}", lvl="ERROR"); time.sleep(3)
                 # Stop render thread
                 self.running = False
+                
+                # Print debug logs even on error
+                self.print_debug_logs()
+                
                 return {"success": False, "error": str(e)}
             finally:
                 # Ensure render thread stops
@@ -511,6 +541,10 @@ Examples:
   minidani --branch-prefix "feat/" "Add auth"        # Use feat/ prefix
   export BRANCH_PREFIX="bugfix/"                     # Set default prefix
   minidani "Fix login bug"                           # Uses bugfix/ prefix
+  
+  # Debug mode
+  minidani -d "Create API"                           # Show debug logs at end
+  minidani --debug -f prompt.md                      # Debug with file input
         """
     )
     
@@ -529,6 +563,11 @@ Examples:
         type=str,
         default=None,
         help="Branch prefix (e.g., 'feature/', 'feat/', 'bugfix/'). Defaults to $BRANCH_PREFIX env var or no prefix"
+    )
+    parser.add_argument(
+        "-d", "--debug",
+        action="store_true",
+        help="Enable debug mode - print detailed logs after execution"
     )
     
     args = parser.parse_args()
@@ -569,7 +608,7 @@ Examples:
     # Use current working directory as the repository path
     repo_path = Path.cwd()
     
-    minidani = MiniDaniRetry(repo_path, prompt, branch_prefix=branch_prefix)
+    minidani = MiniDaniRetry(repo_path, prompt, branch_prefix=branch_prefix, debug=args.debug)
     result = minidani.run()
     
     print("\n" + "="*70)

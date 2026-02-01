@@ -599,6 +599,53 @@ r = self.run_oc(..., timeout=1800)
 r = self.run_oc(..., timeout=480)
 ```
 
+### Debug Mode
+
+Enable detailed logging that prints after execution completes:
+
+```bash
+# Enable debug logs
+minidani -d "Create API"
+minidani --debug -f prompt.md
+
+# Normal mode (no debug logs)
+minidani "Create API"
+```
+
+**Debug output format:**
+```
+================================================================================
+                                  DEBUG LOGS                                  
+================================================================================
+[2026-02-01 13:20:15.123] [Sys     ] [INFO   ] MiniDani Starting...
+[2026-02-01 13:20:15.456] [Sys     ] [INFO   ] Gen branch
+[2026-02-01 13:20:18.234] [Sys     ] [SUCCESS] Branch (approved): oauth-auth
+[2026-02-01 13:20:18.567] [Sys     ] [INFO   ] Setup worktrees (Round 1)
+[2026-02-01 13:20:19.123] [Sys     ] [SUCCESS] WT A R1
+...
+[2026-02-01 13:29:45.345] [Sys     ] [SUCCESS] Done 565.2s
+================================================================================
+Total debug entries: 21
+================================================================================
+```
+
+**Log format:** `[timestamp] [manager] [level] message`
+- **timestamp**: YYYY-MM-DD HH:MM:SS.mmm
+- **manager**: Sys, MA, MB, MC (8 chars)
+- **level**: INFO, SUCCESS, WORKING, JUDGE, WINNER, WARNING, ERROR (7 chars)
+
+**When to use:**
+- Debugging issues or failures
+- Understanding execution timeline
+- Analyzing performance bottlenecks
+- Troubleshooting manager behavior
+
+**Benefits:**
+- ✅ Doesn't clutter TUI during execution
+- ✅ Complete log history with precise timestamps
+- ✅ Easy to grep/filter for specific events
+- ✅ Helpful for bug reports
+
 [↑ Back to top](#table-of-contents)
 
 ---
