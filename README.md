@@ -12,6 +12,7 @@ MiniDani runs 3 AI coding agents in parallel competing to implement your feature
 - [Quick Start](#quick-start)
 - [Installation](#installation)
 - [How It Works](#how-it-works)
+- [Branch Name Approval](#branch-name-approval)
 - [Judging Criteria](#judging-criteria)
 - [Live TUI Interface](#live-tui-interface)
 - [Configuration](#configuration)
@@ -92,10 +93,14 @@ minidani < prompt.md
 ```
 
 **What happens:**
-- 3 parallel implementations start immediately
-- Live TUI shows progress (phases, managers, scores, activity log)
-- After 30-40 minutes, you have the best solution auto-selected
-- Winner branch is ready for PR
+1. **Branch name approval** - MiniDani proposes a branch name (e.g., `feature/oauth-auth`)
+   - You have 20 seconds to approve (Y), reject (n), or provide custom name
+   - If no response: auto-accepts proposed name
+   - If rejected: prompts for manual entry
+2. **Parallel execution** - 3 implementations start in isolated worktrees
+3. **Live TUI** - Shows real-time progress (phases, managers, scores, activity log)
+4. **Automatic selection** - Judge picks best implementation
+5. **Ready to merge** - Winner branch ready for PR (30-40 min total)
 
 [↑ Back to top](#table-of-contents)
 
@@ -180,6 +185,8 @@ minidani "Create hello.py that prints hello world"
 User Prompt
     ↓
 [Phase 1] Generate branch name → feature/oauth-auth
+          ⏱️  20s approval window (auto-accept if no response)
+          ✅ Y = Accept | ❌ n = Custom | feature/name = Direct input
     ↓
 [Phase 2] Create 3 git worktrees (isolated workspaces)
     ↓
@@ -222,6 +229,62 @@ Round 2: A=85, B=88, C=82  ✅ Winner: B (88/100)
 - `pr-creator.md` - Phase 6: Generate PR descriptions
 
 Each agent has detailed instructions, best practices, and evaluation criteria.
+
+[↑ Back to top](#table-of-contents)
+
+---
+
+## Branch Name Approval
+
+After MiniDani generates a branch name, you have **20 seconds** to approve or customize it:
+
+### Interactive Prompt
+
+```bash
+==================================================
+🌿 Proposed branch name: feature/oauth-jwt-auth
+==================================================
+Approve? [Y/n/custom name]: 
+(Auto-accept in 20s if no response)
+```
+
+### Response Options
+
+| Input | Action | Example |
+|-------|--------|---------|
+| **Y** or **yes** or **Enter** | Accept proposed name | `feature/oauth-jwt-auth` |
+| **n** or **no** | Prompt for custom entry | You provide: `feature/my-auth` |
+| **feature/...** | Direct custom name | `feature/custom-name` |
+| *No response (20s)* | Auto-accept | `feature/oauth-jwt-auth` |
+
+### Examples
+
+**Accept proposed name:**
+```bash
+Approve? [Y/n/custom name]: y
+✅ Branch name approved
+```
+
+**Reject and provide custom:**
+```bash
+Approve? [Y/n/custom name]: n
+Enter custom branch name: feature/my-oauth
+✅ Using custom branch: feature/my-oauth
+```
+
+**Direct custom name:**
+```bash
+Approve? [Y/n/custom name]: feature/awesome-auth
+✅ Using custom branch: feature/awesome-auth
+```
+
+**Auto-accept (timeout):**
+```bash
+Approve? [Y/n/custom name]: 
+⏱️  Timeout - auto-accepting branch name
+```
+
+**Why this matters:** Branch names become part of your git history and are visible in PRs, so having control over naming ensures consistency with your team's conventions.
 
 [↑ Back to top](#table-of-contents)
 

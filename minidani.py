@@ -127,6 +127,24 @@ class MiniDaniRetry:
         footer_text = f"🏆 Winner: {self.state.winner.upper()}" if self.state.winner else "Running..."
         layout["footer"].update(Panel(Text(footer_text, style="bold green" if self.state.winner else "dim"), border_style="dim"))
     
+    def get_input_with_timeout(self, prompt_text, timeout_sec):
+        """Get user input with timeout. Returns (input_str, timed_out)"""
+        import select
+        
+        print(f"\n{prompt_text}", flush=True)
+        print(f"(Auto-accept in {timeout_sec}s if no response)", flush=True)
+        
+        # Check if input is available (Unix only)
+        if hasattr(select, 'select'):
+            ready, _, _ = select.select([sys.stdin], [], [], timeout_sec)
+            if ready:
+                return sys.stdin.readline().strip(), False
+            else:
+                return "", True
+        else:
+            # Fallback for Windows - no timeout support
+            return input().strip(), False
+    
     def run_oc(self, p, c=None, t=300, agent=None):
         """Run OpenCode with optional agent system prompt"""
         try:
@@ -151,8 +169,48 @@ class MiniDaniRetry:
         if r:
             for l in r.get("response","").split("\n"):
                 if l.strip().startswith("feature/") and len(l)<50: bn=l.strip(); break
-        self.state.branch_base = bn; self.state.phase_progress[0]=100
-        self.log(f"Branch: {bn}", lvl="SUCCESS")
+        
+        # Pause TUI for user confirmation
+        print("\n" + "="*70)
+        print(f"🌿 Proposed branch name: {bn}")
+        print("="*70)
+        
+        response, timed_out = self.get_input_with_timeout(
+            "Approve? [Y/n/custom name]: ",
+            timeout_sec=20
+        )
+        
+        if timed_out:
+            print("⏱️  Timeout - auto-accepting branch name")
+            self.log(f"Branch (auto): {bn}", lvl="SUCCESS")
+        elif response.lower() in ['', 'y', 'yes']:
+            print("✅ Branch name approved")
+            self.log(f"Branch (approved): {bn}", lvl="SUCCESS")
+        elif response.lower() in ['n', 'no']:
+            # Prompt for custom name
+            print("Enter custom branch name (e.g., feature/my-feature): ", end='', flush=True)
+            custom = sys.stdin.readline().strip()
+            if custom and custom.startswith("feature/"):
+                bn = custom
+                print(f"✅ Using custom branch: {bn}")
+                self.log(f"Branch (custom): {bn}", lvl="SUCCESS")
+            else:
+                print(f"⚠️  Invalid format, using original: {bn}")
+                self.log(f"Branch (fallback): {bn}", lvl="WARNING")
+        else:
+            # User typed something else - treat as custom branch name
+            if response.startswith("feature/"):
+                bn = response
+                print(f"✅ Using custom branch: {bn}")
+                self.log(f"Branch (custom): {bn}", lvl="SUCCESS")
+            else:
+                print(f"⚠️  Invalid format '{response}', using original: {bn}")
+                self.log(f"Branch (fallback): {bn}", lvl="WARNING")
+        
+        print("="*70 + "\n")
+        self.state.branch_base = bn
+        self.state.phase_progress[0]=100
+        time.sleep(1)  # Brief pause before resuming TUI
     
     def p2_setup(self, round_num: int):
         self.log(f"Setup worktrees (Round {round_num})"); self.state.current_phase=1
