@@ -163,8 +163,13 @@ class MiniDaniRetry:
                     agent_prompt = agent_path.read_text()
                     p = f"{agent_prompt}\n\n---\n\n{p}"
             
-            r = subprocess.run([str(self.opencode), "-p", p, "-f", "json"] + (["-c", str(c)] if c else []), 
-                             capture_output=True, text=True, timeout=t)
+            # Build command: opencode run --format json [--session <id>] <prompt>
+            cmd = [str(self.opencode), "run", "--format", "json"]
+            if c:
+                cmd.extend(["--session", str(c)])
+            cmd.append(p)
+            
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=t)
             
             if r.returncode == 0:
                 return json.loads(r.stdout), None
