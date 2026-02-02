@@ -378,8 +378,22 @@ class MiniDaniRetry:
             # Worktree folder uses only suffix (no prefix): reponame_suffix_r1_a
             wt = self.repo_path.parent / f"{self.repo_path.name}_{suffix}_r{round_num}_{m}"
             
-            subprocess.run(["git","worktree","add",str(wt),"-b",br], 
+            # Delete branch if it already exists (prevents worktree creation failure)
+            subprocess.run(["git","branch","-D",br], 
                          cwd=self.repo_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+            # Create worktree - check for errors
+            result = subprocess.run(["git","worktree","add",str(wt),"-b",br], 
+                         cwd=self.repo_path, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                error_msg = result.stderr or result.stdout or "unknown error"
+                self.log(f"WT {m.upper()} R{round_num} FAILED: {error_msg[:100]}", lvl="ERROR")
+                # Try to clean up any partial worktree
+                if wt.exists():
+                    subprocess.run(["git","worktree","remove",str(wt),"--force"], 
+                                 cwd=self.repo_path, stderr=subprocess.DEVNULL)
+                raise Exception(f"Failed to create worktree for manager {m}: {error_msg[:200]}")
             
             mg.worktree, mg.branch, mg.round = wt, br, round_num
             mg.status, mg.score, mg.iteration = "pending", None, 0  # Reset
@@ -561,6 +575,11 @@ Generate PR description.""",
         # Get branch name approval BEFORE starting TUI (needs user input)
         try:
             self.log("MiniDani Starting...")
+            
+            # Clean up any orphaned worktrees from previous failed runs
+            subprocess.run(["git","worktree","prune"], cwd=self.repo_path, 
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
             self.state.current_round = 1
             self.p1_branch()
         except KeyboardInterrupt:
