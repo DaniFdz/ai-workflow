@@ -109,7 +109,6 @@ Install from [opencode.ai/docs](https://opencode.ai/docs)
 | Flag | Description |
 |------|-------------|
 | `-n, --no-pr` | Commit locally, don't create PR |
-| `-d, --debug` | Print detailed logs after execution |
 | `-b, --branch-name` | Specify branch name manually |
 | `-f, --file` | Read prompt from file |
 | `--branch-prefix` | Add prefix to branch (e.g., "feat/") |
@@ -121,8 +120,8 @@ Install from [opencode.ai/docs](https://opencode.ai/docs)
 cd /tmp && mkdir test && cd test
 git init && echo "# Test" > README.md && git add . && git commit -m "init"
 
-# Run with debug
-minidani -d -n "Create hello.py that prints Hello World"
+# Run
+minidani -n "Create hello.py that prints Hello World"
 
 # Check result
 git log --oneline -1

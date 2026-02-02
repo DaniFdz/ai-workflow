@@ -16,7 +16,6 @@ MiniDani runs 3 AI coding agents in parallel competing to implement your feature
 - [Branch Name Approval](#branch-name-approval)
 - [Worktree Naming](#worktree-naming)
 - [Judging Criteria](#judging-criteria)
-- [Live TUI Interface](#live-tui-interface)
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
 - [Advanced Usage](#advanced-usage)
@@ -100,7 +99,7 @@ minidani < prompt.md
    - If no response: auto-accepts proposed name
    - If rejected: prompts for manual entry
 2. **Parallel execution** - 3 implementations start in isolated worktrees
-3. **Live TUI** - Shows real-time progress (phases, managers, scores, activity log)
+3. **Live logs** - Shows real-time progress in terminal
 4. **Automatic selection** - Judge picks best implementation
 5. **Ready to merge** - Winner branch ready for PR (30-40 min total)
 
@@ -529,44 +528,46 @@ Judges evaluate on 4 dimensions:
 
 ---
 
-## Live TUI Interface
+## Output
 
-While running, you see:
+MiniDani logs all activity to stdout:
 
 ```
-┌─────────────────────────────────────────────┐
-│ 🦞 MiniDani [Round 1]                      │
-│ feature/oauth-auth | 00:04:32               │
-└─────────────────────────────────────────────┘
+[18:22:15] [Sys     ] ℹ️ MiniDani Starting...
+[18:22:15] [Sys     ] ℹ️ Determining branch name
+[18:22:18] [Sys     ] ✅ Branch: oauth-auth
+[18:22:18] [Sys     ] ℹ️ Setting up worktrees (Round 1)
+[18:22:19] [Sys     ] ✅ Worktree A ready
+[18:22:19] [Sys     ] ✅ Worktree B ready
+[18:22:19] [Sys     ] ✅ Worktree C ready
+[18:22:19] [Sys     ] ℹ️ Running 3 managers (Round 1)
+[18:22:19] [MA      ] 🔄 Start R1
+[18:22:19] [MB      ] 🔄 Start R1
+[18:22:19] [MC      ] 🔄 Start R1
+[18:25:42] [MC      ] ✅ OK R1
+[18:26:35] [MA      ] ✅ OK R1
+[18:27:18] [MB      ] ✅ OK R1
+[18:27:18] [Sys     ] ✅ Managers done: 3/3 complete
+[18:27:18] [Judge   ] ⚖️ Judging Round 1
+[18:27:25] [Judge   ] ⚖️ Scores: A=87, B=95, C=82
+[18:27:25] [Judge   ] 🏆 Winner: B
+[18:27:25] [Sys     ] ℹ️ Cleaning up losers
+[18:27:26] [Sys     ] ✅ Removed A
+[18:27:26] [Sys     ] ✅ Removed C
+[18:27:26] [Sys     ] ℹ️ Creating PR
+[18:27:45] [PR      ] ✅ PR created: https://github.com/user/repo/pull/123
+[18:27:45] [Sys     ] ✅ Done in 330.2s
 
-┌─ Phases ──────────┐  ┌─ Managers (Round 1) ──────────┐
-│ ✅ 1. Branch  100%│  │ 🤖 Manager A                   │
-│ ✅ 2. Setup   100%│  │    🔄 running (i3)             │
-│ 🔄 3. Managers 67%│  │    Implementing auth logic     │
-│ ⏳ 4. Judge     0%│  │                                │
-│ ⏳ 5. Cleanup   0%│  │ 🤖 Manager B                   │
-│ ⏳ 6. PR        0%│  │    🔄 running (i4)             │
-└───────────────────┘  │    Writing tests               │
-                        │    🏆 Score: 88/100            │
-                        │                                │
-                        │ 🤖 Manager C                   │
-                        │    ✅ complete (i2)            │
-                        │    Done                        │
-                        │    Score: 75/100               │
-                        └────────────────────────────────┘
-                        
-┌─ Activity Log ────────────────────────────────┐
-│ 18:22:15 [MA] 🔄 Start R1                    │
-│ 18:22:17 [MB] 🔄 Start R1                    │
-│ 18:22:19 [MC] 🔄 Start R1                    │
-│ 18:25:42 [MC] ✅ OK R1                       │
-│ 18:26:35 [MA] ✅ OK R1                       │
-│ 18:27:18 [MB] ✅ OK R1                       │
-│ 18:27:20 [Judge] ⚖️ Scores R1: A=87,B=88,C=75│
-│ 18:27:21 [Judge] 🏆 Winner: B                │
-└───────────────────────────────────────────────┘
-
- 🏆 Winner: B
+======================================================================
+RESULT: {
+  "success": true,
+  "winner": "b",
+  "branch": "oauth-auth-r1-b",
+  "round": 1,
+  "scores": {"a": 87, "b": 95, "c": 82},
+  "elapsed": 330.2,
+  "pr_url": "https://github.com/user/repo/pull/123"
+}
 ```
 
 [↑ Back to top](#table-of-contents)
@@ -597,110 +598,6 @@ r = self.run_oc(..., timeout=1800)
 
 # Judge timeout (default: 8 minutes)
 r = self.run_oc(..., timeout=480)
-```
-
-### Debug Mode
-
-Enable detailed logging that prints after execution completes:
-
-```bash
-# Enable debug logs
-minidani -d "Create API"
-minidani --debug -f prompt.md
-
-# Normal mode (no debug logs)
-minidani "Create API"
-```
-
-**Debug output format:**
-```
-================================================================================
-                                  DEBUG LOGS                                  
-================================================================================
-[2026-02-01 13:20:15.123] [Sys     ] [INFO   ] MiniDani Starting...
-[2026-02-01 13:20:15.456] [Sys     ] [INFO   ] Gen branch
-[2026-02-01 13:20:18.234] [Sys     ] [SUCCESS] Branch (approved): oauth-auth
-[2026-02-01 13:20:18.567] [Sys     ] [INFO   ] Setup worktrees (Round 1)
-[2026-02-01 13:20:19.123] [Sys     ] [SUCCESS] WT A R1
-...
-[2026-02-01 13:29:45.345] [Sys     ] [SUCCESS] Done 565.2s
-================================================================================
-Total debug entries: 21
-================================================================================
-```
-
-**Log format:** `[timestamp] [manager] [level] message`
-- **timestamp**: YYYY-MM-DD HH:MM:SS.mmm
-- **manager**: Sys, MA, MB, MC (8 chars)
-- **level**: INFO, SUCCESS, WORKING, JUDGE, WINNER, WARNING, ERROR (7 chars)
-
-**When to use:**
-- Debugging issues or failures
-- Understanding execution timeline
-- Analyzing performance bottlenecks
-- Troubleshooting manager behavior
-
-**Error logging:**
-When managers, judge, or other agents fail, debug logs capture detailed error information:
-```
-[2026-02-01 13:25:45.123] [MA      ] [ERROR  ] Fail R1
-[2026-02-01 13:25:45.124] [MA      ] [ERROR  ] Error details: Exit code 1
-Stderr: OpenCode error: model timeout
-Stdout: [partial output...]
-```
-
-This helps diagnose:
-- Why a manager failed (timeout, model error, syntax error)
-- Judge parsing errors or evaluation failures
-- PR generation issues
-- Branch name generation problems
-
-**Benefits:**
-- ✅ Doesn't clutter TUI during execution
-- ✅ Complete log history with precise timestamps
-- ✅ Easy to grep/filter for specific events
-- ✅ Detailed error messages when things fail
-- ✅ Helpful for bug reports with full context
-
-### Practical Debugging Tips
-
-**See all errors in real-time:**
-```bash
-# View all errors as they happen
-minidani -d "task" 2>&1 | grep ERROR
-
-# Save to file for later analysis
-minidani -d "task" 2>&1 | tee debug.log
-```
-
-**Filter errors by manager:**
-```bash
-# See only Manager A errors
-grep "\[MA\].*ERROR" debug.log
-
-# See only Manager B errors
-grep "\[MB\].*ERROR" debug.log
-
-# See only Manager C errors
-grep "\[MC\].*ERROR" debug.log
-```
-
-**Debug workflow:**
-1. Manager fails → Check stderr in debug logs
-2. Identify error cause (timeout, syntax, model issue)
-3. Fix the root problem
-4. Re-run with same prompt
-
-**Common error patterns:**
-```bash
-# Model timeouts
-grep "model timeout" debug.log
-
-# Exit codes (non-zero = failure)
-grep "Exit code [^0]" debug.log
-
-# OpenCode specific errors
-grep "OpenCode error" debug.log
 ```
 
 [↑ Back to top](#table-of-contents)
