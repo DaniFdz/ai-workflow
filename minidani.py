@@ -60,11 +60,7 @@ class MiniDaniRetry:
         # Agent timeouts for OpenCode agents (models defined in agent .md frontmatter)
         # Note: branch-namer now uses generate_branch_name.py (not an OpenCode agent)
         self.agent_timeouts = {
-            "manager": 7200,      # 2 hours
-            "judge": 1800,        # 30 min
-            "pr-creator": 300,    # 5 min
-            "_default": 300
-            # Note: red-team and blue-team are subagents called by manager, not by minidani
+            "manager": 7200,      # 2 hours - only manager has TTL
         }
         self.state = SystemState(
             prompt=user_prompt, 
@@ -166,7 +162,7 @@ class MiniDaniRetry:
         """
         try:
             # Get timeout for agent
-            timeout = t if t is not None else self.agent_timeouts.get(agent, 300)
+            timeout = t if t is not None else self.agent_timeouts.get(agent)  # None = no timeout
             
             # Log start
             self.log(f"Starting {agent or 'opencode'} (timeout: {timeout}s)", mgr=log_prefix, lvl="INFO")
