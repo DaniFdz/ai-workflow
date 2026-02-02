@@ -211,32 +211,24 @@ class MiniDaniRetry:
             return
         self.log("Gen branch"); self.state.current_phase=0
         
-        # Ask branch-namer agent to generate with configured prefix
-        if self.branch_prefix:
-            prompt = f"""Branch prefix to use: {self.branch_prefix}
-Task description: {self.user_prompt}
-
-Generate a branch name using the prefix '{self.branch_prefix}' followed by a concise description."""
-        else:
-            prompt = f"""No prefix required - generate simple branch name.
-Task description: {self.user_prompt}
-
-Generate a concise branch name (no prefix, just description in kebab-case)."""
-        
-        # Model and timeout configured in agents.json
-        r, error = self.run_oc(prompt, self.repo_path, agent="branch-namer")
+        # Use simple OpenAI tool for branch name generation
         bn = f"{self.branch_prefix}task"  # Fallback
         
-        if r:
-            response_text = r.get("response", "")
-            for line in response_text.split("\n"):
-                line = line.strip()
-                # Accept any line that starts with the configured prefix
-                if line.startswith(self.branch_prefix) and len(line) < 50:
-                    bn = line
-                    break
-        elif error and self.debug:
-            self.log(f"Branch namer failed: {error[:100]}", lvl="ERROR")
+        try:
+            script_path = Path(__file__).parent / "generate_branch_name.py"
+            cmd = ["python3", str(script_path), self.user_prompt]
+            if self.branch_prefix:
+                cmd.extend(["--prefix", self.branch_prefix])
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                data = json.loads(result.stdout)
+                bn = data.get("branch_name", bn)
+            else:
+                self.log(f"Branch namer failed: {result.stderr[:200]}", lvl="ERROR")
+        except Exception as e:
+            self.log(f"Branch namer exception: {str(e)[:200]}", lvl="ERROR")
         
         # Pause TUI for user confirmation
         print("\n" + "="*70)
