@@ -189,7 +189,21 @@ class MiniDaniRetry:
             r = subprocess.run(cmd, input=p, capture_output=True, text=True, timeout=timeout)
             
             if r.returncode == 0:
-                return json.loads(r.stdout), None
+                # OpenCode returns JSON Lines (one JSON object per line)
+                # Parse each line and extract text events
+                response_text = ""
+                for line in r.stdout.strip().split('\n'):
+                    if not line.strip():
+                        continue
+                    try:
+                        event = json.loads(line)
+                        if event.get("type") == "text" and "part" in event:
+                            text = event["part"].get("text", "")
+                            response_text += text
+                    except json.JSONDecodeError:
+                        continue
+                
+                return {"response": response_text}, None
             else:
                 # Capture error information
                 error_msg = f"Exit code {r.returncode}"
