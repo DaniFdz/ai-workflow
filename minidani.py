@@ -148,21 +148,32 @@ class MiniDaniRetry:
     
     def get_input_with_timeout(self, prompt_text, timeout_sec):
         """Get user input with timeout. Returns (input_str, timed_out)"""
-        import select
+        import threading
         
-        print(f"\n{prompt_text}", flush=True)
-        print(f"(Auto-accept in {timeout_sec}s if no response)", flush=True)
+        print(f"\n{prompt_text}", end='', flush=True)
+        print(f"\n(Auto-accept in {timeout_sec}s if no response)", flush=True)
         
-        # Check if input is available (Unix only)
-        if hasattr(select, 'select'):
-            ready, _, _ = select.select([sys.stdin], [], [], timeout_sec)
-            if ready:
-                return sys.stdin.readline().strip(), False
-            else:
-                return "", True
+        user_input = []
+        timed_out = [False]
+        
+        def get_input():
+            try:
+                line = sys.stdin.readline().strip()
+                user_input.append(line)
+            except Exception:
+                pass
+        
+        input_thread = threading.Thread(target=get_input, daemon=True)
+        input_thread.start()
+        input_thread.join(timeout=timeout_sec)
+        
+        if input_thread.is_alive():
+            # Timeout occurred
+            timed_out[0] = True
+            return "", True
         else:
-            # Fallback for Windows - no timeout support
-            return input().strip(), False
+            # Got input
+            return user_input[0] if user_input else "", False
     
     def run_oc(self, p, c=None, t=None, agent=None):
         """Run OpenCode with optional agent. Returns (result, error_msg)
@@ -241,7 +252,7 @@ class MiniDaniRetry:
         print("="*70)
         
         response, timed_out = self.get_input_with_timeout(
-            "Approve? [Y/n/custom name]: ",
+            "Approve? [Y/n/custom-name]: ",
             timeout_sec=20
         )
         
@@ -252,17 +263,9 @@ class MiniDaniRetry:
             print("✅ Branch name approved")
             self.log(f"Branch (approved): {bn}", lvl="SUCCESS")
         elif response.lower() in ['n', 'no']:
-            # Prompt for custom name
-            example = f"{self.branch_prefix}my-feature" if self.branch_prefix else "my-custom-branch"
-            print(f"Enter custom branch name (e.g., {example}): ", end='', flush=True)
-            custom = sys.stdin.readline().strip()
-            if self._validate_branch_name(custom):
-                bn = custom
-                print(f"✅ Using custom branch: {bn}")
-                self.log(f"Branch (custom): {bn}", lvl="SUCCESS")
-            else:
-                print(f"⚠️  Invalid format (spaces/special chars not allowed), using original: {bn}")
-                self.log(f"Branch (fallback): {bn}", lvl="WARNING")
+            print("❌ Rejected. Using fallback: task")
+            bn = f"{self.branch_prefix}task"
+            self.log(f"Branch (rejected): {bn}", lvl="WARNING")
         else:
             # User typed something else - treat as custom branch name
             if self._validate_branch_name(response):
