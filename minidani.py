@@ -43,9 +43,10 @@ class SystemState:
     winner: Optional[str] = None
 
 class MiniDaniRetry:
-    def __init__(self, repo_path: Path, user_prompt: str, branch_prefix: str = "", debug: bool = False):
+    def __init__(self, repo_path: Path, user_prompt: str, branch_prefix: str = "", branch_name: str = "", debug: bool = False):
         self.repo_path, self.user_prompt = repo_path, user_prompt
         self.branch_prefix = branch_prefix
+        self.branch_name = branch_name  # Manual branch name (overrides generation)
         self.debug = debug
         self.debug_logs = []  # Accumulate debug logs here
         self.opencode = Path.home() / ".opencode" / "bin" / "opencode"
@@ -146,20 +147,7 @@ class MiniDaniRetry:
         footer_text = f"🏆 Winner: {self.state.winner.upper()}" if self.state.winner else "Running..."
         layout["footer"].update(Panel(Text(footer_text, style="bold green" if self.state.winner else "dim"), border_style="dim"))
     
-    def get_input_with_timeout(self, prompt_text, timeout_sec):
-        """Get user input directly from TTY (not stdin, which may be redirected)"""
-        print(f"\n{prompt_text}", end='', flush=True)
-        try:
-            # Open /dev/tty directly to read from terminal (not redirected stdin)
-            with open('/dev/tty', 'r') as tty:
-                response = tty.readline().strip()
-            return response, False
-        except (FileNotFoundError, PermissionError, OSError):
-            # No TTY available (CI/automated/background) - auto-accept
-            print(" (auto-accept, no TTY)")
-            return "", False
-        except (EOFError, KeyboardInterrupt):
-            return "", True
+    # get_input_with_timeout() removed - branch name now specified via --branch-name or auto-generated
     
     def run_oc(self, p, c=None, t=None, agent=None, log_prefix="OpenCode"):
         """Run OpenCode with optional agent. Returns (result, error_msg)
@@ -231,10 +219,22 @@ class MiniDaniRetry:
     def p1_branch(self):
         if self.state.branch_base:  # Already have branch from round 1
             return
-        self.log("Gen branch"); self.state.current_phase=0
+        self.log("Determining branch name"); self.state.current_phase=0
         
-        # Use simple OpenAI tool for branch name generation (descriptive part only)
-        descriptive_name = "task"  # Fallback
+        # Option 1: Manual branch name provided via --branch-name
+        if self.branch_name:
+            if not self._validate_branch_name(self.branch_name):
+                raise ValueError(f"Invalid branch name: {self.branch_name} (no spaces or special chars allowed)")
+            
+            # Add prefix if configured
+            bn = f"{self.branch_prefix}{self.branch_name}" if self.branch_prefix else self.branch_name
+            self.log(f"Using manual branch name: {bn}", lvl="SUCCESS")
+            self.state.branch_base = bn
+            self.state.phase_progress[0] = 100
+            return
+        
+        # Option 2: Generate with OpenAI (requires API key)
+        self.log("Generating branch name with OpenAI...", lvl="INFO")
         
         try:
             script_path = Path(__file__).parent / "generate_branch_name.py"
@@ -244,52 +244,39 @@ class MiniDaniRetry:
             
             if result.returncode == 0:
                 data = json.loads(result.stdout)
-                descriptive_name = data.get("branch_name", descriptive_name)
+                descriptive_name = data.get("branch_name", None)
+                
+                if not descriptive_name:
+                    raise ValueError("Branch name generator returned empty name")
+                
+                # Add prefix if configured
+                bn = f"{self.branch_prefix}{descriptive_name}"
+                self.log(f"Generated branch name: {bn}", lvl="SUCCESS")
+                self.state.branch_base = bn
+                self.state.phase_progress[0] = 100
             else:
-                self.log(f"Branch namer failed: {result.stderr[:200]}", lvl="ERROR")
+                # Generation failed - check if it's missing API key
+                stderr = result.stderr.lower()
+                if "openai" in stderr or "api" in stderr or "key" in stderr or "modulenotfounderror" in stderr:
+                    raise ValueError(
+                        "OpenAI API not available. Please either:\n"
+                        "  1. Install OpenAI: pip install openai\n"
+                        "  2. Set OPENAI_API_KEY environment variable\n"
+                        "  3. Or specify branch name manually: minidani --branch-name <name> ..."
+                    )
+                else:
+                    raise ValueError(f"Branch name generation failed: {result.stderr[:200]}")
+        except subprocess.TimeoutExpired:
+            raise ValueError("Branch name generation timed out. Use --branch-name to specify manually.")
+        except json.JSONDecodeError:
+            raise ValueError("Branch name generator returned invalid JSON. Use --branch-name to specify manually.")
         except Exception as e:
-            self.log(f"Branch namer exception: {str(e)[:200]}", lvl="ERROR")
-        
-        # Add prefix if configured
-        bn = f"{self.branch_prefix}{descriptive_name}"
-        
-        # Pause TUI for user confirmation
-        print("\n" + "="*70)
-        print(f"🌿 Proposed branch name: {bn}")
-        if self.branch_prefix:
-            print(f"   (using prefix: {self.branch_prefix})")
-        else:
-            print(f"   (no prefix configured)")
-        print("="*70)
-        
-        response, cancelled = self.get_input_with_timeout(
-            "Approve? [Y/n/custom-name] (or Enter to accept): ",
-            timeout_sec=20
-        )
-        
-        if cancelled:
-            print("❌ Cancelled")
-            raise KeyboardInterrupt
-        elif response.lower() in ['', 'y', 'yes']:
-            print("✅ Branch name approved")
-            self.log(f"Branch (approved): {bn}", lvl="SUCCESS")
-        elif response.lower() in ['n', 'no']:
-            print("❌ Rejected. Using fallback: task")
-            bn = f"{self.branch_prefix}task"
-            self.log(f"Branch (rejected): {bn}", lvl="WARNING")
-        else:
-            # User typed something else - treat as custom branch name
-            if self._validate_branch_name(response):
-                bn = response
-                print(f"✅ Using custom branch: {bn}")
-                self.log(f"Branch (custom): {bn}", lvl="SUCCESS")
-            else:
-                print(f"⚠️  Invalid format '{response}' (spaces/special chars not allowed), using original: {bn}")
-                self.log(f"Branch (fallback): {bn}", lvl="WARNING")
-        
-        print("="*70 + "\n")
-        self.state.branch_base = bn
-        self.state.phase_progress[0] = 100
+            if "openai" in str(e).lower() or "api" in str(e).lower():
+                raise ValueError(
+                    f"OpenAI API error: {str(e)[:100]}\n"
+                    "Use --branch-name <name> to specify branch name manually."
+                )
+            raise
     
     def _validate_branch_name(self, name: str) -> bool:
         """Validate branch name - allow any format without spaces or special chars"""
@@ -719,6 +706,9 @@ Generate PR description.""",
         except KeyboardInterrupt:
             self.cleanup_all_worktrees()
             return {"success": False, "error": "User cancelled during branch selection"}
+        except ValueError as e:
+            # Branch name generation/validation error
+            return {"success": False, "error": str(e)}
         
         print("\n🚀 Starting parallel execution...\n")
         
@@ -804,13 +794,19 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Basic usage (auto-generates branch name with OpenAI)
   minidani "Create a REST API"                      # Inline prompt
   minidani -f prompt.md                              # From file
   cat prompt.md | minidani                           # From stdin
   minidani < prompt.md                               # From stdin redirect
   
+  # Manual branch name (no OpenAI required)
+  minidani -b add-auth "Add authentication"          # Specify branch name
+  minidani --branch-name fix-login -f prompt.md      # From file with custom name
+  
   # Custom branch prefix
   minidani --branch-prefix "feat/" "Add auth"        # Use feat/ prefix
+  minidani -b login --branch-prefix "feat/" "..."    # Branch: feat/login
   export BRANCH_PREFIX="bugfix/"                     # Set default prefix
   minidani "Fix login bug"                           # Uses bugfix/ prefix
   
@@ -835,6 +831,12 @@ Examples:
         type=str,
         default=None,
         help="Branch prefix (e.g., 'feature/', 'feat/', 'bugfix/'). Defaults to $BRANCH_PREFIX env var or no prefix"
+    )
+    parser.add_argument(
+        "-b", "--branch-name",
+        type=str,
+        default=None,
+        help="Branch name (required if OpenAI API not available). Will be prefixed with --branch-prefix if set."
     )
     parser.add_argument(
         "-d", "--debug",
@@ -880,7 +882,13 @@ Examples:
     # Use current working directory as the repository path
     repo_path = Path.cwd()
     
-    minidani = MiniDaniRetry(repo_path, prompt, branch_prefix=branch_prefix, debug=args.debug)
+    minidani = MiniDaniRetry(
+        repo_path, 
+        prompt, 
+        branch_prefix=branch_prefix, 
+        branch_name=args.branch_name or "",
+        debug=args.debug
+    )
     result = minidani.run()
     
     print("\n" + "="*70)
