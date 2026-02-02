@@ -1,6 +1,6 @@
 ---
 description: Objectively evaluate and compare implementations and select winner
-mode: subagent
+mode: primary
 model: anthropic/claude-opus-4-5
 temperature: 0.1
 tools:

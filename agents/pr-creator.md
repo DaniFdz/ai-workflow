@@ -1,6 +1,6 @@
 ---
 description: Generate professional Pull Request descriptions
-mode: subagent
+mode: primary
 model: anthropic/claude-opus-4-5
 temperature: 0.5
 tools:
