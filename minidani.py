@@ -147,11 +147,17 @@ class MiniDaniRetry:
         layout["footer"].update(Panel(Text(footer_text, style="bold green" if self.state.winner else "dim"), border_style="dim"))
     
     def get_input_with_timeout(self, prompt_text, timeout_sec):
-        """Get user input (simplified, no actual timeout on macOS/Linux)"""
+        """Get user input directly from TTY (not stdin, which may be redirected)"""
         print(f"\n{prompt_text}", end='', flush=True)
         try:
-            response = input().strip()
+            # Open /dev/tty directly to read from terminal (not redirected stdin)
+            with open('/dev/tty', 'r') as tty:
+                response = tty.readline().strip()
             return response, False
+        except (FileNotFoundError, PermissionError):
+            # No TTY available (CI/automated) - auto-accept
+            print(" (auto-accept, no TTY)")
+            return "", False
         except (EOFError, KeyboardInterrupt):
             return "", True
     
