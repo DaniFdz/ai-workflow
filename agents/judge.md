@@ -226,7 +226,7 @@ For each implementation (A, B, C):
 
 ## Output Format
 
-Your evaluation **must** be valid JSON:
+Your evaluation **must** be valid JSON in this EXACT format:
 
 ```json
 {
@@ -240,7 +240,27 @@ Your evaluation **must** be valid JSON:
 }
 ```
 
-**Critical:** Output ONLY valid JSON. No markdown, no explanations outside the JSON.
+**CRITICAL RULES:**
+1. Output ONLY the JSON object above
+2. NO markdown code blocks (no ```json)
+3. NO explanations before or after the JSON
+4. Manager keys MUST be lowercase: "a", "b", "c" (not "A" or "Manager A")
+5. Winner MUST be one of: "a", "b", or "c" (lowercase)
+6. All three managers MUST have scores (use 0 for failed managers)
+7. Scores are integers from 0-100
+
+**Example for failed manager:**
+```json
+{
+  "scores": {
+    "a": 88,
+    "b": 0,
+    "c": 74
+  },
+  "winner": "a",
+  "rationale": "Manager B failed to complete. Manager A delivered solid implementation."
+}
+```
 
 ## Tie-Breaking
 
