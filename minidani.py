@@ -44,11 +44,12 @@ class SystemState:
     pr_url: Optional[str] = None
 
 class MiniDaniRetry:
-    def __init__(self, repo_path: Path, user_prompt: str, branch_prefix: str = "", branch_name: str = "", debug: bool = False):
+    def __init__(self, repo_path: Path, user_prompt: str, branch_prefix: str = "", branch_name: str = "", debug: bool = False, no_pr: bool = False):
         self.repo_path, self.user_prompt = repo_path, user_prompt
         self.branch_prefix = branch_prefix
         self.branch_name = branch_name  # Manual branch name (overrides generation)
         self.debug = debug
+        self.no_pr = no_pr  # If True, commit to original repo instead of creating PR
         self.debug_logs = []  # Accumulate debug logs here
         # Find opencode in PATH (installed via npm globally)
         import shutil
@@ -649,14 +650,76 @@ Evaluate and provide JSON response.""",
         self.log(f"Cleanup done: {cleaned_worktrees} worktrees, {cleaned_branches} branches", lvl="INFO")
     
     def p6_pr(self):
-        self.log("Pushing and creating PR..."); self.state.current_phase=5
         w = self.state.managers[self.state.winner]
-        
         self.log(f"Winner: {self.state.winner.upper()}, Score: {w.score}, Round: {w.round}", lvl="INFO")
         
-        # Run pr-creator agent in the winner's worktree to stage, commit, push and create PR
-        r, error = self.run_oc(
-            f"""Original task: {self.user_prompt}
+        if self.no_pr:
+            # --no-pr mode: commit changes to original repo instead of creating PR
+            self.log("Committing to original repo (--no-pr mode)..."); self.state.current_phase=5
+            
+            # Run pr-creator agent to stage and commit (but not push/PR)
+            r, error = self.run_oc(
+                f"""Original task: {self.user_prompt}
+
+Winning implementation: Manager {self.state.winner.upper()}
+Score: {w.score}/100
+
+Summary of implementation: {w.summary}
+
+Your job:
+1. Check what files were created/modified (git status)
+2. Stage ONLY production-relevant files (source code, tests, docs) - exclude .opencode/, plan.md, logs, __pycache__, etc.
+3. Commit with a clear message describing the implementation
+
+IMPORTANT: Do NOT push or create a PR. Only stage and commit locally.""",
+                w.worktree,  # Run in winner's worktree
+                agent="pr-creator",
+                log_prefix="Commit"
+            )
+            
+            if r:
+                self.log("Changes committed to worktree", lvl="SUCCESS")
+                
+                # Now copy the committed changes to the original repo
+                # Get the list of changed files from the worktree
+                try:
+                    # Get diff between worktree HEAD and base
+                    diff_result = subprocess.run(
+                        ["git", "diff", "--name-only", "HEAD~1", "HEAD"],
+                        cwd=w.worktree, capture_output=True, text=True
+                    )
+                    changed_files = [f.strip() for f in diff_result.stdout.strip().split('\n') if f.strip()]
+                    
+                    # Copy each changed file to the original repo
+                    import shutil
+                    for f in changed_files:
+                        src = w.worktree / f
+                        dst = self.repo_path / f
+                        if src.exists():
+                            dst.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(src, dst)
+                            self.log(f"Copied: {f}", lvl="INFO")
+                    
+                    # Stage and commit in original repo
+                    if changed_files:
+                        subprocess.run(["git", "add"] + changed_files, cwd=self.repo_path)
+                        commit_msg = f"feat: {self.state.branch_base}\n\nImplemented by Manager {self.state.winner.upper()} (Score: {w.score}/100)"
+                        subprocess.run(["git", "commit", "-m", commit_msg], cwd=self.repo_path)
+                        self.log("Changes committed to original repo", lvl="SUCCESS")
+                    else:
+                        self.log("No files to copy", lvl="WARNING")
+                        
+                except Exception as e:
+                    self.log(f"Error copying changes: {e}", lvl="ERROR")
+            elif error:
+                self.log(f"Commit failed: {error[:200]}", lvl="ERROR")
+        else:
+            # Normal mode: create PR
+            self.log("Pushing and creating PR..."); self.state.current_phase=5
+            
+            # Run pr-creator agent in the winner's worktree to stage, commit, push and create PR
+            r, error = self.run_oc(
+                f"""Original task: {self.user_prompt}
 
 Winning implementation: Manager {self.state.winner.upper()}
 Score: {w.score}/100
@@ -672,23 +735,23 @@ Your job:
 
 The PR title should briefly describe what was implemented.
 Output the PR URL at the end.""",
-            w.worktree,  # Run in winner's worktree
-            agent="pr-creator",
-            log_prefix="PR"
-        )
-        
-        if r:
-            response = r.get("response", "")
-            # Try to extract PR URL from response
-            import re
-            pr_match = re.search(r'https://github\.com/[^\s]+/pull/\d+', response)
-            if pr_match:
-                self.state.pr_url = pr_match.group(0)
-                self.log(f"PR created: {self.state.pr_url}", lvl="SUCCESS")
-            else:
-                self.log(f"PR response: {response[:300]}", lvl="INFO")
-        elif error:
-            self.log(f"PR creation failed: {error[:200]}", lvl="ERROR")
+                w.worktree,  # Run in winner's worktree
+                agent="pr-creator",
+                log_prefix="PR"
+            )
+            
+            if r:
+                response = r.get("response", "")
+                # Try to extract PR URL from response
+                import re
+                pr_match = re.search(r'https://github\.com/[^\s]+/pull/\d+', response)
+                if pr_match:
+                    self.state.pr_url = pr_match.group(0)
+                    self.log(f"PR created: {self.state.pr_url}", lvl="SUCCESS")
+                else:
+                    self.log(f"PR response: {response[:300]}", lvl="INFO")
+            elif error:
+                self.log(f"PR creation failed: {error[:200]}", lvl="ERROR")
         
         self.state.phase_progress[5]=100
     
@@ -838,6 +901,10 @@ Examples:
   # Debug mode
   minidani -d "Create API"                           # Show debug logs at end
   minidani --debug -f prompt.md                      # Debug with file input
+  
+  # No PR mode (commit to original repo instead)
+  minidani -n "Refactor utils"                       # Commit locally, no PR
+  minidani --no-pr "Add feature"                     # Same as above
         """
     )
     
@@ -867,6 +934,11 @@ Examples:
         "-d", "--debug",
         action="store_true",
         help="Enable debug mode - print detailed logs after execution"
+    )
+    parser.add_argument(
+        "-n", "--no-pr",
+        action="store_true",
+        help="Don't create PR - instead commit winning changes to original repo"
     )
     
     args = parser.parse_args()
@@ -912,7 +984,8 @@ Examples:
         prompt, 
         branch_prefix=branch_prefix, 
         branch_name=args.branch_name or "",
-        debug=args.debug
+        debug=args.debug,
+        no_pr=args.no_pr
     )
     result = minidani.run()
     
