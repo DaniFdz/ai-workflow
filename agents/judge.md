@@ -1,7 +1,7 @@
 ---
 description: Objectively evaluate and compare implementations and select winner
 mode: primary
-model: anthropic/claude-opus-4-5
+model: openai/gpt-5-codex
 temperature: 0.1
 tools:
   write: false

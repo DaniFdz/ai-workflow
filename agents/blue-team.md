@@ -2,7 +2,7 @@
 description: Implementation specialist - writes production-quality code when invoked by manager
 mode: subagent
 hidden: false
-model: anthropic/claude-opus-4-5
+model: openai/gpt-5-codex
 temperature: 0.3
 tools:
   write: true

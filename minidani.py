@@ -60,11 +60,11 @@ class MiniDaniRetry:
         # Agent timeouts for OpenCode agents (models defined in agent .md frontmatter)
         # Note: branch-namer now uses generate_branch_name.py (not an OpenCode agent)
         self.agent_timeouts = {
-            "manager": 1800,
-            "judge": 480,
-            "pr-creator": 300,
-            "red-team": 1800,
-            "blue-team": 1200,
+            "manager": 7200,      # 2 hours
+            "judge": 1800,        # 30 min
+            "pr-creator": 300,    # 5 min
+            "red-team": 7200,     # 2 hours
+            "blue-team": 7200,    # 2 hours
             "_default": 300
         }
         self.state = SystemState(
