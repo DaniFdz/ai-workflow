@@ -72,15 +72,14 @@ tools:
 
 ### OpenCode Integration
 
-MiniDani uses [OpenCode](https://opencode.ai) v1.1.x (from Anomaly, via npm):
+MiniDani uses [OpenCode](https://opencode.ai) v1.1.x:
 
 ```bash
-# Install
-npm install -g opencode-ai
-
 # CLI usage
 opencode run "prompt" --agent <name> --format json
 ```
+
+Install from [opencode.ai/docs](https://opencode.ai/docs)
 
 **Key flags:**
 - `--agent <name>` - Use specific agent
@@ -132,7 +131,7 @@ cat hello.py
 
 ## Common Issues
 
-1. **OpenCode not found** - Install with `npm install -g opencode-ai`
+1. **OpenCode not found** - Install from [opencode.ai/docs](https://opencode.ai/docs)
 2. **Worktree conflicts** - Run `git worktree prune` in repo
 3. **Agent not found** - Check `agents/<name>.md` exists with valid frontmatter
 

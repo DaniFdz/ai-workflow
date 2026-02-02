@@ -113,7 +113,7 @@ minidani < prompt.md
 ### Prerequisites
 
 - **Python 3.8+**
-- **OpenCode CLI** - Install with `npm install -g opencode-ai` (from [opencode.ai](https://opencode.ai))
+- **OpenCode CLI** - Install from [opencode.ai](https://opencode.ai/docs)
 
 ### Automatic Installation (Recommended)
 
@@ -718,7 +718,7 @@ opencode --version
 # If not in PATH, find it
 which opencode
 
-# Install: npm install -g opencode-ai
+# Install from https://opencode.ai/docs
 ```
 
 ### Worktree conflicts
