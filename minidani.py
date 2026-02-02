@@ -161,7 +161,7 @@ class MiniDaniRetry:
         except (EOFError, KeyboardInterrupt):
             return "", True
     
-    def run_oc(self, p, c=None, t=None, agent=None):
+    def run_oc(self, p, c=None, t=None, agent=None, log_prefix="OpenCode"):
         """Run OpenCode with optional agent. Returns (result, error_msg)
         
         Args:
@@ -169,10 +169,14 @@ class MiniDaniRetry:
             c: Session/context path (for continuation)
             t: Timeout (overrides default if provided)
             agent: Agent name (uses OpenCode's --agent flag)
+            log_prefix: Prefix for log messages (e.g., "MA", "Judge")
         """
         try:
             # Get timeout for agent
             timeout = t if t is not None else self.agent_timeouts.get(agent, 300)
+            
+            # Log start
+            self.log(f"Starting {agent or 'opencode'} (timeout: {timeout}s)", mgr=log_prefix, lvl="INFO")
             
             # Build command: opencode run --format json [--agent <name>] [<cwd>]
             cmd = [str(self.opencode), "run", "--format", "json"]
@@ -185,8 +189,15 @@ class MiniDaniRetry:
             if c:
                 cmd.append(str(c))
             
+            # Log command being executed
+            self.log(f"Exec: opencode run --agent {agent} {c if c else ''}", mgr=log_prefix, lvl="INFO")
+            
             # Pass prompt via stdin (more reliable for long prompts)
+            start_time = time.time()
             r = subprocess.run(cmd, input=p, capture_output=True, text=True, timeout=timeout)
+            elapsed = time.time() - start_time
+            
+            self.log(f"Completed in {elapsed:.1f}s", mgr=log_prefix, lvl="INFO")
             
             if r.returncode == 0:
                 # OpenCode returns JSON Lines (one JSON object per line)
@@ -413,8 +424,12 @@ class MiniDaniRetry:
         try:
             m.phase, m.last_activity, m.iteration = "Impl", "Working...", 1
             # Timeout configured in agents.json (30 min for manager)
-            r, error = self.run_oc(f"User task:\n{self.user_prompt}{feedback}", 
-                          m.worktree, agent="manager")
+            r, error = self.run_oc(
+                f"User task:\n{self.user_prompt}{feedback}", 
+                m.worktree, 
+                agent="manager",
+                log_prefix=f"M{mid.upper()}"
+            )
             if r:
                 m.summary, m.status, m.last_activity = r.get("response","")[:500], "complete", "Done"
                 subprocess.run(["git","add","."], cwd=m.worktree)
@@ -436,12 +451,34 @@ class MiniDaniRetry:
         ts = [threading.Thread(target=self.rm, args=(m, round_num)) for m in ["a","b","c"]]
         for t in ts: t.start()
         st = time.time()
+        last_log_time = st
+        
         while any(t.is_alive() for t in ts):
             time.sleep(2)
+            elapsed = time.time() - st
             self.state.phase_progress[2]=(sum(1 for m in self.state.managers.values() if m.status=="complete")/3)*100
-            if time.time()-st>900: break
+            
+            # Log progress every 60 seconds
+            if time.time() - last_log_time >= 60:
+                completed = sum(1 for m in self.state.managers.values() if m.status=="complete")
+                running = sum(1 for m in self.state.managers.values() if m.status=="running")
+                self.log(f"Progress: {completed}/3 done, {running} running ({elapsed:.0f}s elapsed)", lvl="INFO")
+                last_log_time = time.time()
+            
+            # Timeout after 900s (15 min)
+            if elapsed > 900:
+                self.log("Manager timeout reached (15 min), proceeding...", lvl="WARNING")
+                break
+        
         for t in ts: t.join(1)
         self.state.phase_progress[2]=100
+        
+        # Log final status of each manager
+        for m in ["a", "b", "c"]:
+            mg = self.state.managers[m]
+            status_emoji = "✅" if mg.status == "complete" else "⏳" if mg.status == "running" else "❌"
+            self.log(f"M{m.upper()}: {status_emoji} {mg.status}", lvl="INFO")
+        
         self.log(f"All done R{round_num}", lvl="SUCCESS")
     
     def p4_judge(self, round_num):
@@ -450,7 +487,10 @@ class MiniDaniRetry:
                 for m in ["a","b","c"]]
         self.state.phase_progress[3]=50
         
-        r, error = self.run_oc(f"""Original task: {self.user_prompt[:150]}
+        self.log("Preparing judge evaluation...", lvl="JUDGE")
+        
+        r, error = self.run_oc(
+            f"""Original task: {self.user_prompt[:150]}
 
 Manager A Summary:
 {self.state.managers['a'].summary[:200] if self.state.managers['a'].status=='complete' else 'FAILED'}
@@ -461,8 +501,11 @@ Manager B Summary:
 Manager C Summary:
 {self.state.managers['c'].summary[:200] if self.state.managers['c'].status=='complete' else 'FAILED'}
 
-Evaluate and provide JSON response.""", 
-                       self.repo_path, agent="judge")
+Evaluate and provide JSON response.""",
+            self.repo_path,
+            agent="judge",
+            log_prefix="Judge"
+        )
         
         if r:
             try:
@@ -610,9 +653,13 @@ Evaluate and provide JSON response.""",
         self.log(f"Cleanup done: {cleaned_worktrees} worktrees, {cleaned_branches} branches", lvl="INFO")
     
     def p6_pr(self):
-        self.log("PR desc"); self.state.current_phase=5
+        self.log("Creating PR description..."); self.state.current_phase=5
         w = self.state.managers[self.state.winner]
-        r, error = self.run_oc(f"""Original task: {self.user_prompt}
+        
+        self.log(f"Winner: {self.state.winner.upper()}, Score: {w.score}, Round: {w.round}", lvl="INFO")
+        
+        r, error = self.run_oc(
+            f"""Original task: {self.user_prompt}
 
 Winning implementation: Manager {self.state.winner.upper()}
 Score: {w.score}/100
@@ -620,11 +667,16 @@ Round: {w.round}
 
 Summary: {w.summary}
 
-Generate PR description.""", 
-                       self.repo_path, agent="pr-creator")
+Generate PR description.""",
+            self.repo_path,
+            agent="pr-creator",
+            log_prefix="PR"
+        )
+        
         if r:
-            (w.worktree / "PR_DESCRIPTION.md").write_text(r.get("response",""))
-            self.log("PR done", lvl="SUCCESS")
+            pr_path = w.worktree / "PR_DESCRIPTION.md"
+            pr_path.write_text(r.get("response",""))
+            self.log(f"PR saved to {pr_path.name}", lvl="SUCCESS")
         elif error:
             self.log(f"PR generation failed: {error[:200]}", lvl="ERROR")
         self.state.phase_progress[5]=100
