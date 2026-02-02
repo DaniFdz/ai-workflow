@@ -304,6 +304,56 @@ class MiniDaniRetry:
         print(f"Total debug entries: {len(self.debug_logs)}")
         print("="*80 + "\n")
     
+    def print_debug_report(self):
+        """Print detailed report of what each component did"""
+        if not self.debug:
+            return
+        
+        print("\n" + "="*80)
+        print("DETAILED DEBUG REPORT".center(80))
+        print("="*80)
+        
+        # Manager summaries
+        print("\n📊 MANAGER OUTPUTS:\n")
+        for m_id in ["a", "b", "c"]:
+            mgr = self.state.managers[m_id]
+            print(f"--- Manager {m_id.upper()} ({mgr.status}) ---")
+            if mgr.summary:
+                print(f"Summary ({len(mgr.summary)} chars):")
+                print(mgr.summary[:500])
+                if len(mgr.summary) > 500:
+                    print(f"... (truncated, {len(mgr.summary) - 500} more chars)")
+            else:
+                print("No summary (failed or not run)")
+            print()
+        
+        # Judge output
+        print("\n⚖️  JUDGE EVALUATION:\n")
+        if hasattr(self, '_judge_raw_response'):
+            print(f"Raw response ({len(self._judge_raw_response)} chars):")
+            print(self._judge_raw_response[:1000])
+            if len(self._judge_raw_response) > 1000:
+                print(f"... (truncated, {len(self._judge_raw_response) - 1000} more chars)")
+        else:
+            print("No judge response captured")
+        print()
+        
+        # Winner and PR
+        if self.state.winner:
+            print(f"\n🏆 WINNER: Manager {self.state.winner.upper()}")
+            winner_mgr = self.state.managers[self.state.winner]
+            if winner_mgr.worktree:
+                pr_file = winner_mgr.worktree / "PR_DESCRIPTION.md"
+                if pr_file.exists():
+                    print(f"\n📝 PR DESCRIPTION ({pr_file}):")
+                    print("-" * 80)
+                    print(pr_file.read_text()[:1000])
+                    print("-" * 80)
+                else:
+                    print("\n⚠️  No PR_DESCRIPTION.md found")
+        
+        print("\n" + "="*80 + "\n")
+    
     def p2_setup(self, round_num: int):
         self.log(f"Setup worktrees (Round {round_num})"); self.state.current_phase=1
         
@@ -403,6 +453,8 @@ Evaluate and provide JSON response.""",
         if r:
             try:
                 rp = r.get("response","{}"); s,e = rp.find("{"), rp.rfind("}")+1
+                # Capture for debug report
+                self._judge_raw_response = rp
                 d = json.loads(rp[s:e] if s>=0 and e>s else rp)
                 
                 for m, sc in d.get("scores",{}).items():
@@ -561,6 +613,7 @@ Generate PR description.""",
                 
                 # Print debug logs if enabled
                 self.print_debug_logs()
+                self.print_debug_report()
                 
                 return {
                     "success": True,
@@ -577,6 +630,7 @@ Generate PR description.""",
                 
                 # Print debug logs even on error
                 self.print_debug_logs()
+                self.print_debug_report()
                 
                 return {"success": False, "error": str(e)}
             finally:
