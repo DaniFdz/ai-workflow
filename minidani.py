@@ -53,11 +53,19 @@ class MiniDani:
             managers={"a": ManagerState("a"), "b": ManagerState("b"), "c": ManagerState("c")}
         )
     
-    def log(self, msg: str, mgr: str = "Sys", lvl: str = "INFO"):
-        icons = {"SUCCESS": "✅", "WORKING": "🔄", "JUDGE": "⚖️", "WINNER": "🏆", "WARNING": "⚠️", "INFO": "ℹ️", "ERROR": "❌"}
+    def log(self, msg: str, mgr: str = "Sys", lvl: str = "LOG"):
+        colors = {
+            "DEBUG": "\033[90m",    # Gray
+            "LOG": "\033[0m",       # Default
+            "INFO": "\033[36m",     # Cyan
+            "SUCCESS": "\033[32m",  # Green
+            "WARNING": "\033[33m",  # Yellow
+            "ERROR": "\033[31m",    # Red
+        }
+        reset = "\033[0m"
         timestamp = datetime.now().strftime("%H:%M:%S")
-        icon = icons.get(lvl, "ℹ️")
-        print(f"[{timestamp}] [{mgr:8s}] {icon} {msg}")
+        color = colors.get(lvl, "\033[0m")
+        print(f"{color}[{timestamp}] [{lvl:7s}] [{mgr:8s}] {msg}{reset}")
     
     def run_oc(self, prompt: str, cwd: Path = None, timeout: int = None, agent: str = None, log_prefix: str = "OC"):
         """Run OpenCode with specified agent. Returns (result, error_msg)"""
@@ -164,7 +172,7 @@ class MiniDani:
         """Run a single manager"""
         m = self.state.managers[mid]
         m.status = "running"
-        self.log(f"Start R{round_num}", mgr=f"M{mid.upper()}", lvl="WORKING")
+        self.log(f"Start R{round_num}", mgr=f"M{mid.upper()}", lvl="LOG")
         
         feedback = ""
         if round_num > 1:
@@ -207,7 +215,7 @@ class MiniDani:
     
     def p4_judge(self, round_num: int) -> Dict[str, int]:
         """Phase 4: Judge evaluates all implementations"""
-        self.log(f"Judging Round {round_num}", lvl="JUDGE")
+        self.log(f"Judging Round {round_num}", lvl="INFO")
         
         summaries = "\n\n".join([
             f"Manager {mid.upper()} Summary: {m.summary or '(no output)'}"
@@ -247,8 +255,8 @@ Criteria: Completeness (35%), Code Quality (30%), Correctness (25%), Best Practi
             self.state.managers[mid].score = score
         self.state.winner = winner
         
-        self.log(f"Scores: A={scores['a']}, B={scores['b']}, C={scores['c']}", lvl="JUDGE")
-        self.log(f"Winner: {winner.upper()}", lvl="WINNER")
+        self.log(f"Scores: A={scores['a']}, B={scores['b']}, C={scores['c']}", lvl="INFO")
+        self.log(f"Winner: {winner.upper()}", lvl="SUCCESS")
         
         return scores
     
