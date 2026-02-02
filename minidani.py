@@ -278,8 +278,7 @@ class MiniDaniRetry:
         
         print("="*70 + "\n")
         self.state.branch_base = bn
-        self.state.phase_progress[0]=100
-        time.sleep(1)  # Brief pause before resuming TUI
+        self.state.phase_progress[0] = 100
     
     def _validate_branch_name(self, name: str) -> bool:
         """Validate branch name - allow any format without spaces or special chars"""
@@ -507,16 +506,24 @@ Generate PR description.""",
                     pass
         
         # Start render thread
+        # Get branch name approval BEFORE starting TUI (needs user input)
+        try:
+            self.log("MiniDani Starting...")
+            self.state.current_round = 1
+            self.p1_branch()
+        except KeyboardInterrupt:
+            return {"success": False, "error": "User cancelled during branch selection"}
+        
+        print("\n🚀 Starting parallel execution...\n")
+        
+        # Now start TUI for the rest
         render_thread = threading.Thread(target=render_loop, daemon=True)
         render_thread.start()
         
         with Live(layout, refresh_per_second=4, screen=True, console=self.console):
             try:
-                self.log("MiniDani Starting...")
-                
-                # Round 1
-                self.state.current_round = 1
-                self.p1_branch(); time.sleep(1)
+                # Round 1 (branch already set)
+                time.sleep(0.5)
                 self.p2_setup(round_num=1); time.sleep(1)
                 self.p3_managers(round_num=1); time.sleep(1)
                 scores_r1 = self.p4_judge(round_num=1); time.sleep(2)
