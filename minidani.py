@@ -211,24 +211,25 @@ class MiniDaniRetry:
             return
         self.log("Gen branch"); self.state.current_phase=0
         
-        # Use simple OpenAI tool for branch name generation
-        bn = f"{self.branch_prefix}task"  # Fallback
+        # Use simple OpenAI tool for branch name generation (descriptive part only)
+        descriptive_name = "task"  # Fallback
         
         try:
             script_path = Path(__file__).parent / "generate_branch_name.py"
             cmd = ["python3", str(script_path), self.user_prompt]
-            if self.branch_prefix:
-                cmd.extend(["--prefix", self.branch_prefix])
             
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             if result.returncode == 0:
                 data = json.loads(result.stdout)
-                bn = data.get("branch_name", bn)
+                descriptive_name = data.get("branch_name", descriptive_name)
             else:
                 self.log(f"Branch namer failed: {result.stderr[:200]}", lvl="ERROR")
         except Exception as e:
             self.log(f"Branch namer exception: {str(e)[:200]}", lvl="ERROR")
+        
+        # Add prefix if configured
+        bn = f"{self.branch_prefix}{descriptive_name}"
         
         # Pause TUI for user confirmation
         print("\n" + "="*70)
