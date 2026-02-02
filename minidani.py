@@ -147,33 +147,13 @@ class MiniDaniRetry:
         layout["footer"].update(Panel(Text(footer_text, style="bold green" if self.state.winner else "dim"), border_style="dim"))
     
     def get_input_with_timeout(self, prompt_text, timeout_sec):
-        """Get user input with timeout. Returns (input_str, timed_out)"""
-        import threading
-        
+        """Get user input (simplified, no actual timeout on macOS/Linux)"""
         print(f"\n{prompt_text}", end='', flush=True)
-        print(f"\n(Auto-accept in {timeout_sec}s if no response)", flush=True)
-        
-        user_input = []
-        timed_out = [False]
-        
-        def get_input():
-            try:
-                line = sys.stdin.readline().strip()
-                user_input.append(line)
-            except Exception:
-                pass
-        
-        input_thread = threading.Thread(target=get_input, daemon=True)
-        input_thread.start()
-        input_thread.join(timeout=timeout_sec)
-        
-        if input_thread.is_alive():
-            # Timeout occurred
-            timed_out[0] = True
+        try:
+            response = input().strip()
+            return response, False
+        except (EOFError, KeyboardInterrupt):
             return "", True
-        else:
-            # Got input
-            return user_input[0] if user_input else "", False
     
     def run_oc(self, p, c=None, t=None, agent=None):
         """Run OpenCode with optional agent. Returns (result, error_msg)
@@ -251,14 +231,14 @@ class MiniDaniRetry:
             print(f"   (no prefix configured)")
         print("="*70)
         
-        response, timed_out = self.get_input_with_timeout(
-            "Approve? [Y/n/custom-name]: ",
+        response, cancelled = self.get_input_with_timeout(
+            "Approve? [Y/n/custom-name] (or Enter to accept): ",
             timeout_sec=20
         )
         
-        if timed_out:
-            print("⏱️  Timeout - auto-accepting branch name")
-            self.log(f"Branch (auto): {bn}", lvl="SUCCESS")
+        if cancelled:
+            print("❌ Cancelled")
+            raise KeyboardInterrupt
         elif response.lower() in ['', 'y', 'yes']:
             print("✅ Branch name approved")
             self.log(f"Branch (approved): {bn}", lvl="SUCCESS")
