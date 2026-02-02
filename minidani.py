@@ -116,7 +116,7 @@ class MiniDani:
         if self.branch_name:
             return self.branch_name
         
-        self.log("Generating branch name with OpenAI...")
+        self.log("Generating branch name with OpenAI...", lvl="DEBUG")
         try:
             script = Path(__file__).parent / "generate_branch_name.py"
             result = subprocess.run(
@@ -124,7 +124,13 @@ class MiniDani:
                 capture_output=True, text=True, timeout=30
             )
             if result.returncode == 0 and result.stdout.strip():
-                return result.stdout.strip()
+                # Parse JSON response: {"branch_name": "..."}
+                data = json.loads(result.stdout.strip())
+                branch = data.get("branch_name", "").strip()
+                if branch:
+                    return branch
+        except json.JSONDecodeError as e:
+            self.log(f"Branch JSON parse failed: {e}", lvl="WARNING")
         except Exception as e:
             self.log(f"Branch generation failed: {e}", lvl="WARNING")
         
