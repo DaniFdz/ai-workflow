@@ -3,7 +3,7 @@
 MiniDani with Retry Logic - If all scores < 80, launch second round
 """
 
-import subprocess, json, time, threading, sys, tempfile
+import subprocess, json, time, threading, sys, tempfile, signal
 from pathlib import Path
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -536,6 +536,79 @@ Evaluate and provide JSON response.""",
                     self.log(f"Rm {m.upper()}", lvl="SUCCESS")
         self.state.phase_progress[4]=100
     
+    def cleanup_all_worktrees(self):
+        """
+        Limpia TODOS los worktrees y branches creados por esta sesión.
+        Se ejecuta al finalizar (éxito, error o Ctrl+C) para prevenir corrupción.
+        
+        Maneja casos edge:
+        - Worktrees que no existen físicamente pero están registrados en .git
+        - Branches que ya no existen
+        - Referencias corruptas
+        """
+        self.log("Cleaning up all worktrees...", lvl="INFO")
+        
+        cleaned_worktrees = 0
+        cleaned_branches = 0
+        
+        for m in ["a", "b", "c"]:
+            mg = self.state.managers[m]
+            
+            # Limpiar worktree si fue creado
+            if mg.worktree:
+                try:
+                    # Intentar eliminar worktree (--force maneja casos corruptos)
+                    result = subprocess.run(
+                        ["git", "worktree", "remove", str(mg.worktree), "--force"],
+                        cwd=self.repo_path,
+                        capture_output=True,
+                        text=True
+                    )
+                    
+                    if result.returncode == 0:
+                        cleaned_worktrees += 1
+                        self.log(f"Cleaned worktree {m.upper()}", lvl="SUCCESS")
+                    else:
+                        # Worktree ya no existe o error menor - no crítico
+                        if "not found" not in result.stderr.lower():
+                            self.log(f"Worktree {m.upper()} cleanup note: {result.stderr[:100]}", lvl="WARNING")
+                except Exception as e:
+                    self.log(f"Worktree {m.upper()} cleanup error: {str(e)[:100]}", lvl="WARNING")
+            
+            # Limpiar branch si fue creado
+            if mg.branch:
+                try:
+                    result = subprocess.run(
+                        ["git", "branch", "-D", mg.branch],
+                        cwd=self.repo_path,
+                        capture_output=True,
+                        text=True
+                    )
+                    
+                    if result.returncode == 0:
+                        cleaned_branches += 1
+                        self.log(f"Cleaned branch {m.upper()}", lvl="SUCCESS")
+                    else:
+                        # Branch ya no existe - no crítico
+                        if "not found" not in result.stderr.lower():
+                            self.log(f"Branch {m.upper()} cleanup note: {result.stderr[:100]}", lvl="WARNING")
+                except Exception as e:
+                    self.log(f"Branch {m.upper()} cleanup error: {str(e)[:100]}", lvl="WARNING")
+        
+        # Limpiar referencias huérfanas de worktrees
+        try:
+            subprocess.run(
+                ["git", "worktree", "prune"],
+                cwd=self.repo_path,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            self.log("Pruned orphaned worktree refs", lvl="SUCCESS")
+        except Exception as e:
+            self.log(f"Prune error: {str(e)[:100]}", lvl="WARNING")
+        
+        self.log(f"Cleanup done: {cleaned_worktrees} worktrees, {cleaned_branches} branches", lvl="INFO")
+    
     def p6_pr(self):
         self.log("PR desc"); self.state.current_phase=5
         w = self.state.managers[self.state.winner]
@@ -562,6 +635,15 @@ Generate PR description.""",
         # Flag to stop render thread
         self.running = True
         
+        # Register signal handler for Ctrl+C (cleanup before exit)
+        def signal_handler(sig, frame):
+            self.log("Ctrl+C detected, cleaning up...", lvl="WARNING")
+            self.running = False
+            self.cleanup_all_worktrees()
+            sys.exit(1)
+        
+        signal.signal(signal.SIGINT, signal_handler)
+        
         def render_loop():
             """Background thread to update TUI"""
             while self.running:
@@ -583,6 +665,7 @@ Generate PR description.""",
             self.state.current_round = 1
             self.p1_branch()
         except KeyboardInterrupt:
+            self.cleanup_all_worktrees()
             return {"success": False, "error": "User cancelled during branch selection"}
         
         print("\n🚀 Starting parallel execution...\n")
@@ -655,6 +738,10 @@ Generate PR description.""",
             finally:
                 # Ensure render thread stops
                 self.running = False
+                
+                # Always cleanup worktrees (success, error, or interruption)
+                # This prevents corrupted worktrees on next run
+                self.cleanup_all_worktrees()
 
 if __name__ == "__main__":
     import argparse
