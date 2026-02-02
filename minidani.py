@@ -154,8 +154,8 @@ class MiniDaniRetry:
             with open('/dev/tty', 'r') as tty:
                 response = tty.readline().strip()
             return response, False
-        except (FileNotFoundError, PermissionError):
-            # No TTY available (CI/automated) - auto-accept
+        except (FileNotFoundError, PermissionError, OSError):
+            # No TTY available (CI/automated/background) - auto-accept
             print(" (auto-accept, no TTY)")
             return "", False
         except (EOFError, KeyboardInterrupt):
