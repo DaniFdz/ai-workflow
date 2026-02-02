@@ -63,9 +63,8 @@ class MiniDaniRetry:
             "manager": 7200,      # 2 hours
             "judge": 1800,        # 30 min
             "pr-creator": 300,    # 5 min
-            "red-team": 7200,     # 2 hours
-            "blue-team": 7200,    # 2 hours
             "_default": 300
+            # Note: red-team and blue-team are subagents called by manager, not by minidani
         }
         self.state = SystemState(
             prompt=user_prompt, 

@@ -1,7 +1,7 @@
 ---
 description: Stage, commit, push, and create Pull Request
 mode: primary
-model: anthropic/claude-sonnet-4-5
+model: anthropic/claude-opus-4-5
 temperature: 0.3
 tools:
   write: false
