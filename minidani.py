@@ -52,9 +52,9 @@ class MiniDaniRetry:
         self.console, self.lock = Console(), threading.Lock()
         if not self.opencode.exists(): raise FileNotFoundError("OpenCode not found")
         
-        # Agent timeouts (models are defined in agent .md frontmatter)
+        # Agent timeouts for OpenCode agents (models defined in agent .md frontmatter)
+        # Note: branch-namer now uses generate_branch_name.py (not an OpenCode agent)
         self.agent_timeouts = {
-            "branch-namer": 30,
             "manager": 1800,
             "judge": 480,
             "pr-creator": 300,
