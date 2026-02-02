@@ -41,6 +41,7 @@ class SystemState:
     managers: Dict[str, ManagerState] = field(default_factory=dict)
     activity_log: List[tuple] = field(default_factory=list)
     winner: Optional[str] = None
+    pr_url: Optional[str] = None
 
 class MiniDaniRetry:
     def __init__(self, repo_path: Path, user_prompt: str, branch_prefix: str = "", branch_name: str = "", debug: bool = False):
@@ -49,9 +50,11 @@ class MiniDaniRetry:
         self.branch_name = branch_name  # Manual branch name (overrides generation)
         self.debug = debug
         self.debug_logs = []  # Accumulate debug logs here
-        self.opencode = Path.home() / ".opencode" / "bin" / "opencode"
+        # Find opencode in PATH (installed via npm globally)
+        import shutil
+        self.opencode = shutil.which("opencode")
         self.console, self.lock = Console(), threading.Lock()
-        if not self.opencode.exists(): raise FileNotFoundError("OpenCode not found")
+        if not self.opencode: raise FileNotFoundError("OpenCode not found in PATH. Install with: npm install -g opencode-ai")
         
         # Agent timeouts for OpenCode agents (models defined in agent .md frontmatter)
         # Note: branch-namer now uses generate_branch_name.py (not an OpenCode agent)
@@ -154,10 +157,12 @@ class MiniDaniRetry:
         
         Args:
             p: Prompt text
-            c: Session/context path (for continuation)
+            c: Working directory path
             t: Timeout (overrides default if provided)
-            agent: Agent name (uses OpenCode's --agent flag)
+            agent: Agent name (OpenCode built-in or custom agent)
             log_prefix: Prefix for log messages (e.g., "MA", "Judge")
+        
+        New CLI (v1.1.x): opencode run "message" --agent <name> --format json
         """
         try:
             # Get timeout for agent
@@ -166,53 +171,59 @@ class MiniDaniRetry:
             # Log start
             self.log(f"Starting {agent or 'opencode'} (timeout: {timeout}s)", mgr=log_prefix, lvl="INFO")
             
-            # Build command: opencode run --format json [--agent <name>] [<cwd>]
-            cmd = [str(self.opencode), "run", "--format", "json"]
+            # Build command: opencode run "prompt" [--agent <name>] --format json
+            cmd = [str(self.opencode), "run", p, "--format", "json"]
             
-            # Use agent if specified (OpenCode loads agent from ~/.config/opencode/agents/)
+            # Add agent if specified
             if agent:
                 cmd.extend(["--agent", agent])
             
-            # Add working directory (context) if provided
-            if c:
-                cmd.append(str(c))
-            
             # Log command being executed
-            self.log(f"Exec: opencode run --agent {agent} {c if c else ''}", mgr=log_prefix, lvl="INFO")
+            self.log(f"Exec: opencode run '...' --agent {agent or 'default'} --format json", mgr=log_prefix, lvl="INFO")
             
-            # Pass prompt via stdin (more reliable for long prompts)
+            # Run command from working directory
             start_time = time.time()
-            r = subprocess.run(cmd, input=p, capture_output=True, text=True, timeout=timeout)
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=c)
             elapsed = time.time() - start_time
             
             self.log(f"Completed in {elapsed:.1f}s", mgr=log_prefix, lvl="INFO")
             
             if r.returncode == 0:
-                # OpenCode returns JSON Lines (one JSON object per line)
-                # Parse each line and extract text events
+                # OpenCode 1.1.x returns JSON events (newline-delimited)
                 response_text = ""
                 for line in r.stdout.strip().split('\n'):
                     if not line.strip():
                         continue
                     try:
                         event = json.loads(line)
-                        if event.get("type") == "text" and "part" in event:
-                            text = event["part"].get("text", "")
-                            response_text += text
+                        # Handle different event types
+                        if event.get("type") == "text":
+                            # Text event with content
+                            if "content" in event:
+                                response_text += event["content"]
+                            elif "part" in event and "text" in event["part"]:
+                                response_text += event["part"]["text"]
+                        elif event.get("type") == "message.complete":
+                            # Final message event
+                            if "content" in event:
+                                response_text = event["content"]
+                        elif "response" in event:
+                            response_text += event["response"]
                     except json.JSONDecodeError:
-                        continue
+                        # If not JSON, might be raw text
+                        response_text += line
                 
                 return {"response": response_text}, None
             else:
                 # Capture error information
                 error_msg = f"Exit code {r.returncode}"
                 if r.stderr:
-                    error_msg += f"\nStderr: {r.stderr[:500]}"  # First 500 chars
+                    error_msg += f"\nStderr: {r.stderr[:500]}"
                 if r.stdout:
                     error_msg += f"\nStdout: {r.stdout[:500]}"
                 return None, error_msg
         except subprocess.TimeoutExpired:
-            return None, f"Timeout after {t}s"
+            return None, f"Timeout after {timeout}s"
         except Exception as e:
             return None, f"Exception: {str(e)}"
     
@@ -419,9 +430,7 @@ class MiniDaniRetry:
             )
             if r:
                 m.summary, m.status, m.last_activity = r.get("response","")[:500], "complete", "Done"
-                subprocess.run(["git","add","."], cwd=m.worktree)
-                subprocess.run(["git","commit","-m",f"feat: r{round_num} {mid}"], 
-                             cwd=m.worktree, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                # Don't commit here - let pr-creator decide what files to include in PR
                 self.log(f"OK R{round_num}", mgr=f"M{mid.upper()}", lvl="SUCCESS")
             else:
                 m.status, m.last_activity = "failed", "Failed"
@@ -504,7 +513,7 @@ Evaluate and provide JSON response.""",
                 for m, sc in d.get("scores",{}).items():
                     if m in self.state.managers: self.state.managers[m].score = sc
                 
-                w = d.get("winner","a"); self.state.winner = w
+                w = d.get("winner","a").lower(); self.state.winner = w
                 scores_text = ",".join([f"{k.upper()}={v}" for k,v in d['scores'].items()])
                 
                 self.log(f"Scores R{round_num}: {scores_text}", lvl="JUDGE")
@@ -568,7 +577,7 @@ Evaluate and provide JSON response.""",
     
     def cleanup_all_worktrees(self):
         """
-        Limpia TODOS los worktrees y branches creados por esta sesión.
+        Clean up ALL worktrees and branches created by this session.
         Se ejecuta al finalizar (éxito, error o Ctrl+C) para prevenir corrupción.
         
         Maneja casos edge:
@@ -584,7 +593,7 @@ Evaluate and provide JSON response.""",
         for m in ["a", "b", "c"]:
             mg = self.state.managers[m]
             
-            # Limpiar worktree si fue creado
+            # Clean up worktree if it was created
             if mg.worktree:
                 try:
                     # Intentar eliminar worktree (--force maneja casos corruptos)
@@ -605,7 +614,7 @@ Evaluate and provide JSON response.""",
                 except Exception as e:
                     self.log(f"Worktree {m.upper()} cleanup error: {str(e)[:100]}", lvl="WARNING")
             
-            # Limpiar branch si fue creado
+            # Clean up branch if it was created
             if mg.branch:
                 try:
                     result = subprocess.run(
@@ -625,7 +634,7 @@ Evaluate and provide JSON response.""",
                 except Exception as e:
                     self.log(f"Branch {m.upper()} cleanup error: {str(e)[:100]}", lvl="WARNING")
         
-        # Limpiar referencias huérfanas de worktrees
+        # Clean up orphaned worktree references
         try:
             subprocess.run(
                 ["git", "worktree", "prune"],
@@ -640,32 +649,47 @@ Evaluate and provide JSON response.""",
         self.log(f"Cleanup done: {cleaned_worktrees} worktrees, {cleaned_branches} branches", lvl="INFO")
     
     def p6_pr(self):
-        self.log("Creating PR description..."); self.state.current_phase=5
+        self.log("Pushing and creating PR..."); self.state.current_phase=5
         w = self.state.managers[self.state.winner]
         
         self.log(f"Winner: {self.state.winner.upper()}, Score: {w.score}, Round: {w.round}", lvl="INFO")
         
+        # Run pr-creator agent in the winner's worktree to stage, commit, push and create PR
         r, error = self.run_oc(
             f"""Original task: {self.user_prompt}
 
 Winning implementation: Manager {self.state.winner.upper()}
 Score: {w.score}/100
-Round: {w.round}
 
-Summary: {w.summary}
+Summary of implementation: {w.summary}
 
-Generate PR description.""",
-            self.repo_path,
+Your job:
+1. Check what files were created/modified (git status)
+2. Stage ONLY production-relevant files (source code, tests, docs) - exclude .opencode/, plan.md, logs, __pycache__, etc.
+3. Commit with a clear message describing the implementation
+4. Push the branch to origin
+5. Create a Pull Request using `gh pr create`
+
+The PR title should briefly describe what was implemented.
+Output the PR URL at the end.""",
+            w.worktree,  # Run in winner's worktree
             agent="pr-creator",
             log_prefix="PR"
         )
         
         if r:
-            pr_path = w.worktree / "PR_DESCRIPTION.md"
-            pr_path.write_text(r.get("response",""))
-            self.log(f"PR saved to {pr_path.name}", lvl="SUCCESS")
+            response = r.get("response", "")
+            # Try to extract PR URL from response
+            import re
+            pr_match = re.search(r'https://github\.com/[^\s]+/pull/\d+', response)
+            if pr_match:
+                self.state.pr_url = pr_match.group(0)
+                self.log(f"PR created: {self.state.pr_url}", lvl="SUCCESS")
+            else:
+                self.log(f"PR response: {response[:300]}", lvl="INFO")
         elif error:
-            self.log(f"PR generation failed: {error[:200]}", lvl="ERROR")
+            self.log(f"PR creation failed: {error[:200]}", lvl="ERROR")
+        
         self.state.phase_progress[5]=100
     
     def run(self):
@@ -765,7 +789,8 @@ Generate PR description.""",
                     "branch": self.state.managers[self.state.winner].branch,
                     "round": self.state.managers[self.state.winner].round,
                     "scores": {m: self.state.managers[m].score for m in ["a","b","c"]},
-                    "elapsed": el
+                    "elapsed": el,
+                    "pr_url": self.state.pr_url
                 }
             except Exception as e:
                 self.log(f"Fatal:{e}", lvl="ERROR"); time.sleep(3)
