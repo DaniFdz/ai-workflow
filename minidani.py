@@ -3,7 +3,7 @@
 MiniDani with Retry Logic - If all scores < 80, launch second round
 """
 
-import subprocess, json, time, threading, sys, tempfile, signal, shutil
+import subprocess, json, time, threading, sys, tempfile, signal
 from pathlib import Path
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -357,14 +357,6 @@ class MiniDaniRetry:
     def p2_setup(self, round_num: int):
         self.log(f"Setup worktrees (Round {round_num})"); self.state.current_phase=1
         
-        # Clean up orphaned worktree references first
-        subprocess.run(
-            ["git", "worktree", "prune"],
-            cwd=self.repo_path,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-        
         # Extract suffix from branch_base (part after last /)
         # Examples: "feat/auth" → "auth", "auth" → "auth"
         suffix = self.state.branch_base.split('/')[-1] if '/' in self.state.branch_base else self.state.branch_base
@@ -385,28 +377,6 @@ class MiniDaniRetry:
             
             # Worktree folder uses only suffix (no prefix): reponame_suffix_r1_a
             wt = self.repo_path.parent / f"{self.repo_path.name}_{suffix}_r{round_num}_{m}"
-            
-            # Clean up orphaned worktree directory if it exists
-            # This handles cases where directory exists but isn't registered in git
-            if wt.exists():
-                self.log(f"Orphaned directory detected: {wt.name}", lvl="WARNING")
-                
-                # First try git worktree remove (handles registered worktrees)
-                result = subprocess.run(
-                    ["git", "worktree", "remove", str(wt), "--force"],
-                    cwd=self.repo_path,
-                    capture_output=True,
-                    text=True
-                )
-                
-                # If still exists (wasn't registered in git), remove manually
-                if wt.exists():
-                    self.log(f"Removing orphaned directory manually: {wt.name}", lvl="WARNING")
-                    try:
-                        shutil.rmtree(wt)
-                    except Exception as e:
-                        self.log(f"Failed to remove orphaned dir: {e}", lvl="ERROR")
-                        raise Exception(f"Cannot remove orphaned directory {wt}: {e}")
             
             # Delete branch if it already exists (prevents worktree creation failure)
             subprocess.run(["git","branch","-D",br], 
