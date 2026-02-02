@@ -1,126 +1,67 @@
 # MiniDani Agents
 
-Each agent is a specialized prompt that guides the AI model for a specific task.
+Each agent is a specialized prompt that guides OpenCode for a specific task.
 
 ## Structure
 
 ```
 agents/
 ├── README.md          # This file
-├── branch-namer.md    # Branch naming agent prompt
-├── manager.md         # (TODO) Manager orchestration prompt
-├── judge.md           # (TODO) Evaluation and scoring prompt
-├── pr-creator.md      # (TODO) PR description generator
-├── red-team.md        # (TODO) Code generation specialist
-└── blue-team.md       # (TODO) Quality assurance specialist
-
-../agents.json         # Model + timeout configuration per agent
+├── manager.md         # Orchestrates implementation, delegates to blue/red team
+├── blue-team.md       # Implementation specialist (subagent)
+├── red-team.md        # Quality assurance specialist (subagent)
+├── judge.md           # Evaluates and scores implementations
+└── pr-creator.md      # Stages, commits, pushes, creates PR
 ```
 
-## Configuration
+## Agent Configuration
 
-**All agent configurations are in:** `agents.json` (project root)
+Each agent has YAML frontmatter defining model and behavior:
 
-```json
-{
-  "branch-namer": {
-    "model": "openai/gpt-4o-mini",
-    "timeout": 30
-  },
-  "manager": {
-    "model": "anthropic/claude-opus-4-5",
-    "timeout": 1800
-  }
-}
+```yaml
+---
+description: What this agent does
+mode: primary|subagent
+model: provider/model-name
+temperature: 0.3
+tools:
+  write: true
+  edit: true
+  bash: true
+---
 ```
 
 ## Current Agents
 
-| Agent | Purpose | Model | Status |
-|-------|---------|-------|--------|
-| **branch-namer** | Generate branch names | gpt-4o-mini | ✅ Implemented |
-| **manager** | Orchestrate implementation | claude-opus-4-5 | 📝 Uses inline prompt |
-| **judge** | Evaluate implementations | claude-opus-4-5 | 📝 Uses inline prompt |
-| **pr-creator** | Generate PR descriptions | claude-opus-4-5 | 📝 Uses inline prompt |
-| **red-team** | Code generation | gpt-5-codex | ❌ Not implemented |
-| **blue-team** | Quality assurance | claude-opus-4-5 | ❌ Not implemented |
+| Agent | Mode | Model | Purpose |
+|-------|------|-------|---------|
+| **manager** | primary | claude-opus-4-5 | Orchestrates implementation, delegates to blue/red team |
+| **blue-team** | subagent | gpt-5-codex | Implementation specialist, writes production code |
+| **red-team** | subagent | gpt-5-codex | QA specialist, creates tests and validates |
+| **judge** | primary | gpt-5-codex | Evaluates all 3 implementations, picks winner |
+| **pr-creator** | primary | claude-opus-4-5 | Stages relevant files, commits, pushes, creates PR |
 
 ## How It Works
 
-1. When MiniDani calls an agent (e.g., `agent="branch-namer"`):
-   - Loads `agents/<agent>.md` as system prompt (if exists)
-   - Loads model + timeout from `agents.json`
-   - Prepends agent instructions to user prompt
-   - Calls OpenCode with configured model
+1. MiniDani calls OpenCode with `--agent <name>`
+2. OpenCode loads the agent from `agents/<name>.md`
+3. Agent frontmatter defines model, tools, permissions
+4. Agent instructions guide the task execution
 
-2. Agent prompt structure:
-   ```markdown
-   # Agent Name
-   
-   You are a specialized agent for [task].
-   
-   ## Rules
-   - Rule 1
-   - Rule 2
-   
-   ## Examples
-   Input: ...
-   Output: ...
-   
-   ## Your Task
-   [User prompt will be appended here]
-   ```
+## Editing Agents
 
-## Creating a New Agent
+**Change model:**
+Edit the `model:` field in the agent's frontmatter.
 
-1. **Create the prompt file:**
-   ```bash
-   cat > agents/my-agent.md << 'EOF'
-   # My Agent
-   
-   You are a specialized agent for [specific task].
-   
-   ## Rules
-   - Be concise
-   - Output only [specific format]
-   
-   ## Your Task
-   [User prompt appended here]
-   EOF
-   ```
+**Change behavior:**
+Edit the markdown instructions below the frontmatter.
 
-2. **Add to agents.json:**
-   ```json
-   {
-     "my-agent": {
-       "model": "anthropic/claude-opus-4-5",
-       "timeout": 300,
-       "description": "What this agent does"
-     }
-   }
-   ```
+**Change tools:**
+Edit the `tools:` section in frontmatter to enable/disable capabilities.
 
-3. **Use in code:**
-   ```python
-   result, error = self.run_oc(prompt, context, agent="my-agent")
-   ```
+## Subagents vs Primary
 
-## Best Practices
+- **primary**: Called directly by MiniDani (manager, judge, pr-creator)
+- **subagent**: Called by manager via delegation (blue-team, red-team)
 
-- ✅ **Clear, specific instructions** - No ambiguity
-- ✅ **Output format examples** - Show exactly what you want
-- ✅ **Concise prompts** - Shorter = faster + cheaper
-- ✅ **Right model for task** - Fast models for simple tasks, powerful for complex
-- ✅ **Reasonable timeouts** - 30s for simple, 30m for complex
-
-## Customization
-
-**Change a model:**
-```bash
-jq '.manager.model = "anthropic/claude-sonnet-4-5"' agents.json > tmp && mv tmp agents.json
-```
-
-**Increase timeout:**
-```bash
-jq '.judge.timeout = 600' agents.json > tmp && mv tmp agents.json
-```
+Subagents don't have timeouts in MiniDani - they run within the manager's timeout.

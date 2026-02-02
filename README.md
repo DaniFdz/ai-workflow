@@ -31,7 +31,7 @@ MiniDani runs 3 AI coding agents in parallel competing to implement your feature
 MiniDani creates **competitive pressure** between AI agents to produce better code:
 
 1. **Launch 3 Managers** (A, B, C) in parallel
-2. Each manager independently implements your feature using [OpenCode](https://github.com/unit-mesh/opencode)
+2. Each manager independently implements your feature using [OpenCode](https://opencode.ai)
 3. Each works in an isolated git worktree
 4. A **Judge** evaluates all 3 implementations (0-100 score)
 5. Winner is kept, losers are cleaned up
@@ -113,7 +113,7 @@ minidani < prompt.md
 ### Prerequisites
 
 - **Python 3.8+**
-- **OpenCode CLI** - Install from [OpenCode](https://github.com/unit-mesh/opencode)
+- **OpenCode CLI** - Install with `npm install -g opencode-ai` (from [opencode.ai](https://opencode.ai))
 
 ### Automatic Installation (Recommended)
 
@@ -718,7 +718,7 @@ opencode --version
 # If not in PATH, find it
 which opencode
 
-# Install from: https://github.com/unit-mesh/opencode
+# Install: npm install -g opencode-ai
 ```
 
 ### Worktree conflicts
