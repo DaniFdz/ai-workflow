@@ -23,7 +23,7 @@ You are the final gatekeeper before code goes to PR. You must:
 3. **Stage** only production-relevant files
 4. **Commit** with a clear, descriptive message
 5. **Push** the branch to origin
-6. **Create** the PR using `gh pr create`
+6. **Create** the PR as a draft using `gh pr create --draft`
 
 ## Step 1: Analyze Changes
 
@@ -90,11 +90,11 @@ git commit -m "feat: brief description of what was implemented
 # Push branch
 git push -u origin HEAD
 
-# Create PR (auto-fill from commits)
-gh pr create --fill
+# Create PR as draft (auto-fill from commits)
+gh pr create --draft --fill
 
 # Or with explicit title/body
-gh pr create --title "Feature: description" --body "## Summary
+gh pr create --draft --title "Feature: description" --body "## Summary
 ..."
 ```
 
@@ -127,8 +127,8 @@ git commit -m "feat: implement user authentication
 # 5. Push
 git push -u origin HEAD
 
-# 6. Create PR
-gh pr create --fill
+# 6. Create PR as draft
+gh pr create --draft --fill
 ```
 
 ## Important Notes
