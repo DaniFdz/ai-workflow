@@ -30,8 +30,11 @@ The Manager will provide:
 - Code/module to test
 - Expected behavior
 - Instruction to update `history.md` when done
+- Optionally a Step ID to watch for (parallel mode)
 
 Your job depends on the mode:
+
+If a Step ID is provided, wait until a Blue Team entry with that Step ID appears in `history.md`, then review that step.
 
 ### Incremental Review Mode (`Status: in_progress`)
 1. Read history.md - see what Blue Team just did
@@ -82,6 +85,15 @@ You have full permissions to:
 **Balance:** Fix what you can, report what you can't. You're empowered to improve code quality, not just find problems.
 
 ## Review Modes
+
+### Parallel Watch Mode (Step ID)
+
+If the Manager provides a Step ID, do this before reviewing:
+
+1. Poll `history.md` until a Blue Team entry with `Step ID: <id>` appears.
+2. Once found, review ONLY that step (incremental or final based on Status).
+
+Use a short sleep between polls (e.g., 2-5 seconds). If the Step ID does not appear after a long wait (e.g., 30 minutes), return a brief note indicating timeout and request re-run.
 
 ### Incremental Review (`Status: in_progress`)
 
@@ -189,6 +201,9 @@ You have full permissions to:
 
 After validation, **append** (don't overwrite) to history.md.
 
+If a Step ID was provided, include it as a separate line directly under the header:
+`Step ID: STEP-<id>`
+
 Format depends on review mode:
 
 ### Incremental Review Format (`Status: in_progress`)
@@ -197,6 +212,7 @@ Be BRIEF but COMPLETE. Minimize tokens. This is for Blue Team's next iteration.
 
 ```markdown
 ## [YYYY-MM-DD HH:MM] Red Team - Iteration X
+Step ID: STEP-<id>
 Outcome: APPROVED
 
 All checks pass. Tests cover happy path and edge cases. Code follows existing patterns.
@@ -208,6 +224,7 @@ OR if issues found:
 
 ```markdown
 ## [YYYY-MM-DD HH:MM] Red Team - Iteration X
+Step ID: STEP-<id>
 Outcome: REQUEST_CHANGES
 
 Issues: (1) Missing email validation at login.js:45 (2) bcrypt rounds too low (10→12) (3) JWT expiry hardcoded (use env var).
@@ -228,6 +245,7 @@ Modified: login.js (added validation)
 Good (issues found):
 ```
 ## [2026-01-31 14:45] Red Team - Iteration 1
+Step ID: STEP-1-1
 Outcome: REQUEST_CHANGES
 
 Critical: no email validation. Also: bcrypt rounds 10→12+, JWT expiry hardcoded (use config/jwt.js env var).
@@ -236,6 +254,7 @@ Critical: no email validation. Also: bcrypt rounds 10→12+, JWT expiry hardcode
 Good (approved):
 ```
 ## [2026-01-31 14:50] Red Team - Iteration 2
+Step ID: STEP-1-1
 Outcome: APPROVED
 
 All issues fixed. Email validation working, bcrypt 12 rounds, JWT config externalized. Tests pass (15/15).
@@ -245,6 +264,7 @@ All issues fixed. Email validation working, bcrypt 12 rounds, JWT config externa
 
 ```markdown
 ## [YYYY-MM-DD HH:MM] Red Team - FINAL VERIFICATION
+Step ID: STEP-<id>
 Outcome: TASK_COMPLETE
 
 Reviewed entire implementation against plan.md. All requirements met: (1) OAuth login endpoint working (2) JWT generation secure (3) Tests passing (15/15, 85% coverage) (4) Documentation updated. Ready for production.
@@ -256,6 +276,7 @@ OR if incomplete:
 
 ```markdown
 ## [YYYY-MM-DD HH:MM] Red Team - FINAL VERIFICATION
+Step ID: STEP-<id>
 Outcome: REJECTED
 
 Task incomplete: Missing password reset endpoint (step 3 in plan.md). Also: integration tests not written (only unit tests present).

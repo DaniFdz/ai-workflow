@@ -40,7 +40,7 @@ Use a **Ralph-style iterative workflow** with plan.md and history.md to coordina
 2. **Create `plan.md`** - Write detailed step-by-step implementation plan
 3. **Create `history.md`** - Initialize empty history file for team updates
 
-### Phase 2: Iterative Implementation Loop
+### Phase 2: Iterative Implementation Loop (Parallel Red/Blue)
 
 ```
 LOOP until task complete:
@@ -48,25 +48,20 @@ LOOP until task complete:
   ├─→ Read current plan.md
   │   └─ Identify next step(s) to implement
   │
-  ├─→ Invoke @blue-team via Task tool
-  │   ├─ "Implement step X from plan.md"
-  │   └─ Blue Team:
-  │       • Implements step
-  │       • Appends to history.md with Status: in_progress or Status: done
+  ├─→ Generate Step ID for this unit of work (e.g., STEP-<round>-<n>)
   │
-  ├─→ Read history.md (Blue Team's update)
-  │   └─ Check Status field:
-  │       • Status: in_progress → Incremental review
-  │       • Status: done → Final verification
+  ├─→ Invoke @red-team AND @blue-team in parallel:
+  │   ├─ Red Team (watch mode): "Wait for Step ID <id>, then review that step"
+  │   └─ Blue Team: "Implement step X and include Step ID <id> in history.md"
   │
-  ├─→ Invoke @red-team via Task tool
-  │   ├─ If Status: in_progress:
-  │   │   "Review Blue Team's most recent work (incremental review)"
-  │   │   Red Team validates current step only
-  │   │
-  │   └─ If Status: done:
-  │       "Conduct final verification - review ENTIRE task comprehensively"
-  │       Red Team validates everything against plan.md
+  ├─→ Blue Team:
+  │   • Implements step
+  │   • Appends to history.md with Step ID + Status
+  │
+  ├─→ Red Team:
+  │   • Waits for Step ID to appear
+  │   • Reviews that specific step (incremental vs final by Status)
+  │   • Appends Outcome to history.md
   │
   ├─→ Read history.md (Red Team's update)
   │   └─ Check Outcome field:
@@ -215,6 +210,7 @@ Teams write their updates in chronological order:
 # Implementation History
 
 ## [2026-01-31 14:30] Blue Team - Iteration 1
+Step ID: STEP-1-1
 Status: in_progress
 
 Implemented OAuth login endpoint: JWT generation (15min expiry), bcrypt hashing (12 rounds), rate limiting (5/min), email/password validation.
@@ -223,6 +219,7 @@ Modified: api/auth/login.js, config/jwt.js, middleware/rateLimit.js
 ---
 
 ## [2026-01-31 14:45] Red Team - Iteration 1
+Step ID: STEP-1-1
 Outcome: REQUEST_CHANGES
 
 Critical: no email validation at login.js:45. Also: bcrypt rounds too low (10→12), JWT expiry hardcoded (use env var).
@@ -230,6 +227,7 @@ Critical: no email validation at login.js:45. Also: bcrypt rounds too low (10→
 ---
 
 ## [2026-01-31 15:00] Blue Team - Iteration 2
+Step ID: STEP-1-1
 Status: in_progress
 
 Fixed all issues: added email validation (regex + DNS check), increased bcrypt to 12 rounds, JWT expiry now from JWT_EXPIRY env var (default 15m).
@@ -238,6 +236,7 @@ Modified: api/auth/login.js, config/jwt.js
 ---
 
 ## [2026-01-31 15:15] Red Team - Iteration 2
+Step ID: STEP-1-1
 Outcome: APPROVED
 
 All issues fixed. Email validation robust, bcrypt 12 rounds, config externalized. Tests pass (12/12, 85% coverage). Ready for next step.
@@ -245,6 +244,7 @@ All issues fixed. Email validation robust, bcrypt 12 rounds, config externalized
 ---
 
 ## [2026-01-31 16:00] Blue Team - Iteration 3
+Step ID: STEP-1-1
 Status: done
 
 Implemented password reset endpoint with email verification, token expiry (1hr), secure token generation. All features from plan.md complete.
@@ -253,6 +253,7 @@ Modified: api/auth/reset.js, utils/email.js, tests/auth/reset.test.js
 ---
 
 ## [2026-01-31 16:20] Red Team - FINAL VERIFICATION
+Step ID: STEP-1-1
 Outcome: TASK_COMPLETE
 
 Reviewed entire implementation against plan.md. All requirements met: (1) OAuth login working (2) JWT secure (3) Password reset implemented (4) Tests passing (24/24, 88% coverage) (5) Documentation updated. Production ready.
@@ -381,13 +382,16 @@ You have access to two specialized subagents via the Task tool:
 **Always include:**
 1. Reference to plan.md step
 2. Clear task description
-3. Reminder about Status field
+3. Step ID to include in history.md
+4. Reminder about Status field
 
 **Example delegation:**
 ```
 Use Task tool to invoke @blue-team:
 
 "Implement Step 1 from plan.md: OAuth2 Authentication Module
+
+Step ID: STEP-1-1
 
 Tasks:
 - Create auth.py with login/logout functions
@@ -403,6 +407,7 @@ Requirements:
 
 After implementation:
 - Append to history.md with Status: in_progress (or Status: done if ENTIRE task complete)
+- Include Step ID: STEP-1-1 in your history.md entry
 - Be brief but complete in your entry
 - List modified files
 "
@@ -421,6 +426,10 @@ After implementation:
 Use Task tool to invoke @red-team:
 
 "Incremental review: Validate Blue Team's most recent work (Step 1 in plan.md)
+
+Step ID to watch: STEP-1-1
+
+Wait for that Step ID to appear in history.md, then review ONLY that step.
 
 Blue Team implemented OAuth authentication module. Check history.md to see details.
 
@@ -443,6 +452,10 @@ IMPORTANT: This is incremental review.
 Use Task tool to invoke @red-team:
 
 "Final verification: Blue Team claims ENTIRE task complete
+
+Step ID to watch: STEP-1-1
+
+Wait for that Step ID to appear in history.md, then perform final verification.
 
 Conduct COMPREHENSIVE review:
 - Read ENTIRE history.md from start

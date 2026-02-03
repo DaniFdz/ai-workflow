@@ -57,12 +57,16 @@ You should NOT:
 
 After implementing, **append** (don't overwrite) to history.md with TWO PARTS:
 
+If the Manager provides a Step ID, include it as a separate line directly under the header:
+`Step ID: STEP-<id>`
+
 ### Part 1: Detailed Entry (For Agents - Machine Reading)
 
 Be BRIEF but COMPLETE. Minimize tokens. This is for Red Team and future iterations.
 
 ```markdown
 ## [YYYY-MM-DD HH:MM] Blue Team - Iteration X
+Step ID: STEP-<id>
 Status: in_progress
 
 Implemented [brief description]. [Key technical details].
@@ -91,6 +95,7 @@ Use `Status: in_progress` for all other cases (partial work, one step complete, 
 Good (concise, complete):
 ```
 ## [2026-01-31 14:30] Blue Team - Iteration 1
+Step ID: STEP-1-1
 Status: in_progress
 
 Implemented OAuth login endpoint: JWT generation with 15min expiry, bcrypt hashing (12 rounds), rate limiting (5 req/min), input validation for email/password.
@@ -100,6 +105,7 @@ Modified: api/auth/login.js, config/jwt.js, middleware/rateLimit.js
 Bad (too verbose):
 ```
 ## [2026-01-31 14:30] Blue Team - Iteration 1
+Step ID: STEP-1-1
 Status: in_progress
 
 I have completed the implementation of the OAuth login endpoint as requested. I created a new file called api/auth/login.js and implemented JWT token generation with a 15 minute expiry time. I also added bcrypt-based password hashing using 12 rounds for security. Additionally, I implemented rate limiting to prevent brute force attacks, limiting requests to 5 per minute. Input validation was added for both email and password fields.
@@ -109,6 +115,7 @@ Modified: api/auth/login.js, config/jwt.js, middleware/rateLimit.js
 Bad (missing details):
 ```
 ## [2026-01-31 14:30] Blue Team - Iteration 1
+Step ID: STEP-1-1
 Status: in_progress
 
 Implemented login endpoint. Made some changes.

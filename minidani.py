@@ -8,7 +8,7 @@ import subprocess, json, time, threading, sys, signal, os, shutil
 from pathlib import Path
 from datetime import datetime
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, IO, cast
 
 @dataclass
 class ManagerState:
@@ -19,6 +19,9 @@ class ManagerState:
     score: Optional[int] = None
     summary: Optional[str] = None
     round: int = 1
+    start_time: Optional[float] = None
+    last_log: str = ""
+    last_log_at: Optional[float] = None
 
 @dataclass
 class SystemState:
@@ -42,6 +45,7 @@ class MiniDani:
         self.branch_name = branch_name
         self.no_pr = no_pr
         self.lock = threading.Lock()
+        self._progress_len = 0
         
         self.opencode = shutil.which("opencode")
         if not self.opencode:
@@ -65,49 +69,119 @@ class MiniDani:
         reset = "\033[0m"
         timestamp = datetime.now().strftime("%H:%M:%S")
         color = colors.get(lvl, "\033[0m")
-        print(f"{color}[{timestamp}] [{lvl:7s}] [{mgr:8s}] {msg}{reset}")
+        with self.lock:
+            if sys.stdout.isatty() and self._progress_len > 0:
+                sys.stdout.write("\r" + (" " * self._progress_len) + "\r")
+                self._progress_len = 0
+            print(f"{color}[{timestamp}] [{lvl:7s}] [{mgr:8s}] {msg}{reset}")
     
-    def run_oc(self, prompt: str, cwd: Path = None, timeout: int = None, agent: str = None, log_prefix: str = "OC"):
+    def run_oc(self, prompt: str, cwd: Optional[Path] = None, timeout: Optional[int] = None, agent: Optional[str] = None, log_prefix: str = "OC"):
         """Run OpenCode with specified agent. Returns (result, error_msg)"""
         try:
+            import selectors
+
             self.log(f"Starting {agent or 'opencode'}", mgr=log_prefix, lvl="INFO")
-            
+
             cmd = [self.opencode, "run", prompt, "--format", "json"]
             if agent:
                 cmd.extend(["--agent", agent])
-            
+
             start = time.time()
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd)
-            elapsed = time.time() - start
-            
-            self.log(f"Completed in {elapsed:.1f}s", mgr=log_prefix, lvl="INFO")
-            
-            if r.returncode == 0:
-                response_text = ""
-                for line in r.stdout.strip().split('\n'):
-                    if not line.strip():
+            response_text = ""
+            stderr_lines = []
+
+            proc = subprocess.Popen(
+                cmd,
+                cwd=cwd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1
+            )
+
+            if proc.stdout is None or proc.stderr is None:
+                return None, "Failed to open subprocess pipes"
+
+            selector = selectors.DefaultSelector()
+            selector.register(proc.stdout, selectors.EVENT_READ)
+            selector.register(proc.stderr, selectors.EVENT_READ)
+
+            while True:
+                if timeout and (time.time() - start) > timeout:
+                    proc.kill()
+                    return None, f"Timeout after {timeout}s"
+
+                events = selector.select(timeout=1.0)
+                for key, _ in events:
+                    stream = cast(IO[str], key.fileobj)
+                    line = stream.readline()
+                    if line == "":
+                        try:
+                            selector.unregister(key.fileobj)
+                        except Exception:
+                            pass
                         continue
-                    try:
-                        event = json.loads(line)
-                        if event.get("type") == "text":
-                            if "content" in event:
-                                response_text += event["content"]
-                            elif "part" in event and "text" in event["part"]:
-                                response_text += event["part"]["text"]
-                        elif event.get("type") == "message.complete" and "content" in event:
-                            response_text = event["content"]
-                        elif "response" in event:
-                            response_text += event["response"]
-                    except json.JSONDecodeError:
-                        response_text += line
+
+                    if key.fileobj is proc.stdout:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            event = json.loads(line)
+                            if event.get("type") == "text":
+                                if "content" in event:
+                                    chunk = event["content"]
+                                    response_text += chunk
+                                    if log_prefix.startswith("M"):
+                                        mid = log_prefix[-1].lower()
+                                        if mid in self.state.managers:
+                                            self.state.managers[mid].last_log = chunk[-200:]
+                                            self.state.managers[mid].last_log_at = time.time()
+                                elif "part" in event and "text" in event["part"]:
+                                    chunk = event["part"]["text"]
+                                    response_text += chunk
+                                    if log_prefix.startswith("M"):
+                                        mid = log_prefix[-1].lower()
+                                        if mid in self.state.managers:
+                                            self.state.managers[mid].last_log = chunk[-200:]
+                                            self.state.managers[mid].last_log_at = time.time()
+                            elif event.get("type") == "message.complete" and "content" in event:
+                                response_text = event["content"]
+                            elif "response" in event:
+                                chunk = event["response"]
+                                response_text += chunk
+                                if log_prefix.startswith("M"):
+                                    mid = log_prefix[-1].lower()
+                                    if mid in self.state.managers:
+                                        self.state.managers[mid].last_log = str(chunk)[-200:]
+                                        self.state.managers[mid].last_log_at = time.time()
+                        except json.JSONDecodeError:
+                            response_text += line
+                    else:
+                        line = line.rstrip()
+                        if line:
+                            stderr_lines.append(line)
+                            if log_prefix.startswith("M"):
+                                mid = log_prefix[-1].lower()
+                                if mid in self.state.managers:
+                                    self.state.managers[mid].last_log = line[-200:]
+                                    self.state.managers[mid].last_log_at = time.time()
+
+                if proc.poll() is not None and not selector.get_map():
+                    break
+
+            elapsed = time.time() - start
+            self.log(f"Completed in {elapsed:.1f}s", mgr=log_prefix, lvl="INFO")
+
+            if proc.returncode == 0:
                 return {"response": response_text}, None
-            else:
-                error_msg = f"Exit code {r.returncode}"
-                if r.stderr:
-                    error_msg += f"\nStderr: {r.stderr[:500]}"
-                return None, error_msg
-        except subprocess.TimeoutExpired:
-            return None, f"Timeout after {timeout}s"
+
+            error_msg = f"Exit code {proc.returncode}"
+            if stderr_lines:
+                tail = "\n".join(stderr_lines[-20:])
+                error_msg += f"\nStderr: {tail[:500]}"
+            return None, error_msg
         except Exception as e:
             return None, str(e)
     
@@ -178,6 +252,9 @@ class MiniDani:
         """Run a single manager"""
         m = self.state.managers[mid]
         m.status = "running"
+        m.start_time = time.time()
+        m.last_log = ""
+        m.last_log_at = None
         self.log(f"Start R{round_num}", mgr=f"M{mid.upper()}", lvl="LOG")
         
         feedback = ""
@@ -207,14 +284,86 @@ class MiniDani:
         """Phase 3: Run all managers in parallel"""
         self.log(f"Running 3 managers (Round {round_num})")
         
+        stop_event = threading.Event()
+        def progress_loop():
+            if not sys.stdout.isatty():
+                while not stop_event.is_set():
+                    time.sleep(10)
+                    lines = []
+                    for mid in ["a", "b", "c"]:
+                        m = self.state.managers[mid]
+                        if m.status == "running" and m.start_time:
+                            elapsed = time.time() - m.start_time
+                            last = f" | last: {m.last_log}" if m.last_log else ""
+                            lines.append(f"{mid.upper()} {elapsed:.0f}s{last}")
+                    if lines:
+                        self.log("Progress: " + "; ".join(lines), lvl="INFO")
+                return
+
+            last_len = 0
+            spinner = ["-", "\\", "|", "/"]
+            while not stop_event.is_set():
+                now = time.time()
+                parts = []
+                logs = []
+                earliest_start = None
+                for mid in ["a", "b", "c"]:
+                    m = self.state.managers[mid]
+                    if m.status == "running" and m.start_time:
+                        if earliest_start is None or m.start_time < earliest_start:
+                            earliest_start = m.start_time
+                        elapsed = now - m.start_time
+                        bar_total = self.MANAGER_TIMEOUT or 1
+                        fill = int(min(elapsed / bar_total, 1.0) * 10)
+                        bar = "#" * fill + "." * (10 - fill)
+                        spin = spinner[int(now * 4) % len(spinner)]
+                        parts.append(f"{mid.upper()} {spin} [{bar}] {elapsed:.0f}s")
+                        if m.last_log:
+                            logs.append(f"{mid.upper()}: {m.last_log}")
+                    elif m.status == "complete":
+                        parts.append(f"{mid.upper()} [##########] done")
+                        if m.last_log:
+                            logs.append(f"{mid.upper()}: {m.last_log}")
+                    elif m.status == "failed":
+                        parts.append(f"{mid.upper()} [!!!!!!!!!!] fail")
+                        if m.last_log:
+                            logs.append(f"{mid.upper()}: {m.last_log}")
+
+                total_elapsed = 0.0
+                if earliest_start is not None:
+                    total_elapsed = now - earliest_start
+
+                log_text = " | logs " + " | ".join(logs) if logs else ""
+                line = " ".join(parts) + f" | total {total_elapsed:.0f}s" + log_text
+
+                with self.lock:
+                    pad = " " * max(0, last_len - len(line))
+                    sys.stdout.write("\r" + line + pad)
+                    sys.stdout.flush()
+                    last_len = len(line)
+                    self._progress_len = last_len
+
+                time.sleep(1)
+
+            with self.lock:
+                if last_len:
+                    sys.stdout.write("\r" + (" " * last_len) + "\r")
+                    sys.stdout.flush()
+                    self._progress_len = 0
+
         threads = []
         for mid in ["a", "b", "c"]:
             t = threading.Thread(target=self.run_manager, args=(mid, round_num))
             t.start()
             threads.append(t)
+
+        progress_thread = threading.Thread(target=progress_loop, daemon=True)
+        progress_thread.start()
         
         for t in threads:
             t.join()
+
+        stop_event.set()
         
         complete = sum(1 for m in self.state.managers.values() if m.status == "complete")
         self.log(f"Managers done: {complete}/3 complete", lvl="SUCCESS" if complete > 0 else "WARNING")
@@ -274,13 +423,20 @@ Criteria: Completeness (35%), Code Quality (30%), Correctness (25%), Best Practi
             if mid != self.state.winner and mg.worktree and mg.worktree.exists():
                 subprocess.run(["git", "worktree", "remove", str(mg.worktree), "--force"],
                              cwd=self.repo_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                subprocess.run(["git", "branch", "-D", mg.branch],
-                             cwd=self.repo_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if mg.branch:
+                    subprocess.run(["git", "branch", "-D", mg.branch],
+                                 cwd=self.repo_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 self.log(f"Removed {mid.upper()}", lvl="SUCCESS")
     
     def p6_pr(self):
         """Phase 6: Create PR or commit locally"""
+        if not self.state.winner:
+            raise RuntimeError("Winner not set")
+
         w = self.state.managers[self.state.winner]
+        if not w.worktree:
+            raise RuntimeError("Winner worktree missing")
+
         self.log(f"Winner: {self.state.winner.upper()}, Score: {w.score}")
         
         if self.no_pr:
@@ -395,6 +551,10 @@ Output the PR URL at the end."""
                 self.p3_managers(2)
                 self.p4_judge(2)
             
+            if not self.state.winner:
+                self.log("No winner selected; aborting cleanup/PR", lvl="ERROR")
+                return {"success": False, "error": "No winner selected"}
+
             # Cleanup and PR
             self.p5_cleanup()
             self.p6_pr()
