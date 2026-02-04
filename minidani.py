@@ -62,9 +62,14 @@ class MiniDani:
         # Check for pi coding agent
         self.pi = shutil.which("pi")
         if not self.pi:
-            raise FileNotFoundError(
-                "Pi coding agent not found. Install: npm install -g @mariozechner/pi-coding-agent"
-            )
+            # Check common npm global install location
+            npm_global_pi = Path.home() / ".npm-global" / "bin" / "pi"
+            if npm_global_pi.exists():
+                self.pi = str(npm_global_pi)
+            else:
+                raise FileNotFoundError(
+                    "Pi coding agent not found. Install: npm install -g @mariozechner/pi-coding-agent"
+                )
 
         # Initialize agent pool for parallel execution
         # 3 managers × 2 teams (blue/red) = 6 potential concurrent agents
@@ -109,8 +114,7 @@ class MiniDani:
         """
         Run pi coding agent with specified prompt. Returns (result, error_msg).
 
-        This method uses the pi RPC client to execute prompts. The agent parameter
-        is used for logging purposes (pi doesn't have separate agent configs like OpenCode).
+        This method creates a fresh pi RPC client for each execution.
 
         Args:
             prompt: The task/prompt to send to pi
@@ -128,11 +132,11 @@ class MiniDani:
 
             start = time.time()
 
-            # Create a dedicated client for this execution
-            # Using cwd to ensure pi runs in the correct directory
+            # Create a fresh client for this execution
             client = PiRPCClient(model="claude-sonnet-4-5", cwd=cwd or self.repo_path)
 
             if not client.start():
+                self.log(f"Failed to start pi process", mgr=log_prefix, lvl="ERROR")
                 return None, "Failed to start pi process"
 
             try:
@@ -162,6 +166,7 @@ class MiniDani:
                 client.stop()
 
         except Exception as e:
+            self.log(f"Exception: {str(e)[:100]}", mgr=log_prefix, lvl="ERROR")
             return None, str(e)
 
     def generate_branch_name(self) -> str:

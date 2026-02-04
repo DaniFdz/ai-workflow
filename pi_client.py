@@ -97,10 +97,15 @@ class PiRPCClient:
         if self._running:
             return True
 
-        # Find pi executable
+        # Find pi executable - check common install locations
         pi_path = shutil.which("pi")
         if not pi_path:
-            return False
+            # Check common npm global install location
+            npm_global_pi = Path.home() / ".npm-global" / "bin" / "pi"
+            if npm_global_pi.exists():
+                pi_path = str(npm_global_pi)
+            else:
+                return False
 
         try:
             # Start pi in RPC mode with specified model
@@ -227,7 +232,10 @@ class PiRPCClient:
 
         # Process events until completion or timeout
         start_time = time.time()
+        last_activity = time.time()
         completed = False
+        has_activity = False  # Track if we've seen any activity
+        inactivity_threshold = 10  # seconds of inactivity before checking completion
 
         while not completed:
             # Check timeout
@@ -235,18 +243,38 @@ class PiRPCClient:
                 return None, f"Timeout after {timeout}s"
 
             # Check if process is still running
-            if self.process.poll() is not None:
-                # Process exited unexpectedly
-                if not self._response_text:
-                    return (
-                        None,
-                        f"Pi process exited with code {self.process.returncode}",
-                    )
-                break
+            returncode = self.process.poll()
+            if returncode is not None:
+                # Process exited
+                if returncode == 0 and has_activity:
+                    # Clean exit with activity = success
+                    completed = True
+                    break
+                elif returncode == 0:
+                    # Clean exit but no activity - might still be success
+                    # Give it a moment to see if session logs appear
+                    time.sleep(2)
+                    if self._has_session_output():
+                        completed = True
+                        break
+                    return None, "Pi process exited without producing output"
+                else:
+                    return None, f"Pi process exited with code {returncode}"
+
+            # Check for completion via inactivity after receiving activity
+            if has_activity:
+                elapsed_since_activity = time.time() - last_activity
+                if elapsed_since_activity > inactivity_threshold:
+                    # Long inactivity after activity - check if work is done
+                    if self._has_session_output():
+                        completed = True
+                        break
 
             try:
                 # Wait for next event with short timeout for responsiveness
                 event = self._output_queue.get(timeout=1.0)
+                last_activity = time.time()
+                has_activity = True
 
                 # Handle different event types
                 if event.type == "text":
@@ -264,9 +292,7 @@ class PiRPCClient:
 
                 elif event.type == "tool_call":
                     # Agent is using a tool (file write, bash, etc.)
-                    # Log for debugging but don't interrupt
-                    tool_name = event.data.get("name", "unknown")
-                    # Could add callback here for tool call notifications
+                    pass
 
                 elif event.type == "tool_result":
                     # Result from a tool execution
@@ -275,7 +301,6 @@ class PiRPCClient:
                 elif event.type == "completion":
                     # Agent finished processing
                     completed = True
-                    # Final content might be in completion event
                     final_content = event.data.get("content", "")
                     if final_content and not self._response_text:
                         self._response_text = final_content
@@ -294,7 +319,9 @@ class PiRPCClient:
                     return None, error_msg
 
                 elif event.type == "process_exit":
-                    # Process terminated
+                    # Process terminated - check if we have output
+                    if has_activity or self._has_session_output():
+                        completed = True
                     break
 
                 elif event.type == "raw":
@@ -307,14 +334,76 @@ class PiRPCClient:
 
             except queue.Empty:
                 # No event received, continue waiting
-                continue
+                pass
 
+        # Return based on what we collected
         if self._response_text:
             return self._response_text, None
+        elif has_activity or self._has_session_output():
+            return "Task completed", None
         elif self._error_text:
             return None, self._error_text
         else:
             return None, "No response received"
+
+    def _has_session_output(self) -> bool:
+        """
+        Check if pi has created session output (indicating work was done).
+        
+        Returns:
+            True if session logs exist with completion markers, False otherwise
+        """
+        try:
+            pi_sessions = Path.home() / ".pi" / "agent" / "sessions"
+            if not pi_sessions.exists():
+                return False
+            
+            # Build expected session directory name pattern
+            # Pi creates dirs like: --{cwd_path_with_dashes}--
+            cwd_parts = str(self.cwd).lstrip('/').replace('/', '-')
+            expected_pattern = f"--{cwd_parts}--"
+            
+            for session_dir in pi_sessions.iterdir():
+                if not session_dir.is_dir():
+                    continue
+                    
+                # Check if this session dir matches our cwd
+                if expected_pattern not in session_dir.name:
+                    continue
+                
+                # Check if it has recent session files with completion
+                session_files = list(session_dir.glob("*.jsonl"))
+                if not session_files:
+                    continue
+                    
+                # Check the most recent file for completion markers
+                latest = max(session_files, key=lambda p: p.stat().st_mtime)
+                
+                # File must be recent (within last 2 minutes)
+                age = time.time() - latest.stat().st_mtime
+                if age > 120:
+                    continue
+                
+                # Check if file contains completion markers
+                try:
+                    with open(latest, 'r') as f:
+                        # Read last 1KB to check for completion
+                        f.seek(0, 2)  # Go to end
+                        file_size = f.tell()
+                        read_size = min(1024, file_size)
+                        f.seek(max(0, file_size - read_size))
+                        tail = f.read()
+                        
+                        # Look for stopReason indicators
+                        if '"stopReason":"stop"' in tail or '"stopReason":"end_turn"' in tail:
+                            return True
+                except:
+                    pass
+            
+            return False
+            
+        except Exception:
+            return False
 
     def stop(self):
         """
