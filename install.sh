@@ -20,7 +20,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 # Step 1: Check Python version
-echo -e "${BOLD}[1/4] Checking Python...${NC}"
+echo -e "${BOLD}[1/6] Checking Python...${NC}"
 
 if ! command -v python3 &> /dev/null; then
     echo -e "  ${RED}❌ Python 3 not found${NC}"
@@ -46,7 +46,7 @@ echo -e "  ${GREEN}✅ Python $PYTHON_VERSION (minimum 3.8 required)${NC}"
 echo ""
 
 # Step 2: Setup virtual environment
-echo -e "${BOLD}[2/4] Setting up virtual environment...${NC}"
+echo -e "${BOLD}[2/6] Setting up virtual environment...${NC}"
 
 if [ -d "$VENV_PATH" ]; then
     echo -e "  ${YELLOW}⚠️  Existing venv found, reinstalling dependencies...${NC}"
@@ -65,19 +65,57 @@ deactivate
 echo -e "  ${GREEN}✅ Dependencies installed${NC}"
 echo ""
 
-# Step 3: Install agents for OpenCode
-echo -e "${BOLD}[3/5] Installing agents for OpenCode...${NC}"
+# Step 3: Check/install pi coding agent
+echo -e "${BOLD}[3/6] Checking pi coding agent...${NC}"
+
+# Check if Node.js is installed
+if ! command -v node &> /dev/null; then
+    echo -e "  ${RED}❌ Node.js not found${NC}"
+    echo ""
+    echo "Please install Node.js 20 or higher:"
+    echo "  Ubuntu/Debian: curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs"
+    echo "  macOS: brew install node"
+    echo "  Arch: sudo pacman -S nodejs npm"
+    exit 1
+fi
+
+NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+if [ "$NODE_VERSION" -lt 20 ]; then
+    echo -e "  ${YELLOW}⚠️  Node.js version $(node --version) found (minimum v20 required)${NC}"
+    echo "  Please upgrade Node.js to version 20 or higher"
+    exit 1
+fi
+echo -e "  ${GREEN}✅ Node.js $(node --version) found${NC}"
+
+# Check if pi coding agent is installed
+if ! command -v pi &> /dev/null; then
+    echo -e "  ${YELLOW}⚠️  Pi coding agent not found${NC}"
+    echo -e "  ${BLUE}Installing pi coding agent...${NC}"
+    npm install -g @mariozechner/pi-coding-agent
+    if ! command -v pi &> /dev/null; then
+        echo -e "  ${RED}❌ Failed to install pi coding agent${NC}"
+        echo "  Please install manually: npm install -g @mariozechner/pi-coding-agent"
+        exit 1
+    fi
+fi
+
+PI_VERSION=$(pi --version 2>/dev/null | head -1 || echo "unknown")
+echo -e "  ${GREEN}✅ Pi coding agent found: ${PI_VERSION}${NC}"
+echo ""
+
+# Step 4: Install agents (optional, for reference)
+echo -e "${BOLD}[4/6] Installing agent prompts...${NC}"
 
 AGENTS_SOURCE="$SCRIPT_DIR/agents"
-AGENTS_DEST="$HOME/.config/opencode/agents"
+AGENTS_DEST="$HOME/.config/minidani/agents"
 
 if [ ! -d "$AGENTS_SOURCE" ]; then
     echo -e "  ${RED}❌ agents/ directory not found${NC}"
     exit 1
 fi
 
-# Create .config/opencode if it doesn't exist
-mkdir -p "$HOME/.config/opencode"
+# Create .config/minidani if it doesn't exist
+mkdir -p "$HOME/.config/minidani"
 
 # Backup existing agents if present
 if [ -d "$AGENTS_DEST" ]; then
@@ -91,16 +129,15 @@ cp -r "$AGENTS_SOURCE" "$AGENTS_DEST"
 AGENT_COUNT=$(ls -1 "$AGENTS_DEST" | grep -c '\.md$')
 
 if [ $AGENT_COUNT -gt 0 ]; then
-    echo -e "  ${GREEN}✅ Installed $AGENT_COUNT agents to ~/.config/opencode/agents/${NC}"
+    echo -e "  ${GREEN}✅ Installed $AGENT_COUNT agent prompts to ~/.config/minidani/agents/${NC}"
     echo -e "  ${BLUE}📝 Available: manager, blue-team, red-team, judge, branch-namer, pr-creator${NC}"
 else
-    echo -e "  ${RED}❌ Failed to install agents${NC}"
-    exit 1
+    echo -e "  ${YELLOW}⚠️  No agent prompts found (optional)${NC}"
 fi
 echo ""
 
-# Step 4: Find installation directory
-echo -e "${BOLD}[4/5] Finding installation directory...${NC}"
+# Step 5: Find installation directory
+echo -e "${BOLD}[5/6] Finding installation directory...${NC}"
 
 POSSIBLE_BINS=(
     "$HOME/.local/bin"
@@ -142,8 +179,8 @@ if [ -z "$INSTALL_DIR" ]; then
     echo ""
 fi
 
-# Step 5: Create wrapper script
-echo -e "${BOLD}[5/5] Creating wrapper script...${NC}"
+# Step 6: Create wrapper script
+echo -e "${BOLD}[6/6] Creating wrapper script...${NC}"
 
 WRAPPER_PATH="$INSTALL_DIR/minidani"
 
@@ -182,9 +219,9 @@ echo "  # From stdin"
 echo "  cat prompt.md | minidani"
 echo ""
 echo -e "${BOLD}Configuration:${NC}"
-echo "  Agents: $SCRIPT_DIR/agents/"
-echo "  Models: $SCRIPT_DIR/agents.json"
-echo "  Customize model/timeout per agent by editing agents.json"
+echo "  Agent prompts: $SCRIPT_DIR/agents/"
+echo "  Pi coding agent: $(which pi)"
+echo "  Model: claude-sonnet-4-5 (configurable in minidani.py)"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
