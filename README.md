@@ -30,7 +30,7 @@ MiniDani runs 3 AI coding agents in parallel competing to implement your feature
 MiniDani creates **competitive pressure** between AI agents to produce better code:
 
 1. **Launch 3 Managers** (A, B, C) in parallel
-2. Each manager independently implements your feature using [OpenCode](https://opencode.ai)
+2. Each manager independently implements your feature using [pi coding agent](https://github.com/badlogic/pi-mono)
 3. Each works in an isolated git worktree
 4. A **Judge** evaluates all 3 implementations (0-100 score)
 5. Winner is kept, losers are cleaned up
@@ -112,7 +112,8 @@ minidani < prompt.md
 ### Prerequisites
 
 - **Python 3.8+**
-- **OpenCode CLI** - Install from [opencode.ai](https://opencode.ai/docs)
+- **Node.js 20+** - Required for pi coding agent
+- **Pi coding agent** - Install with: `npm install -g @mariozechner/pi-coding-agent`
 
 ### Automatic Installation (Recommended)
 
@@ -122,6 +123,8 @@ curl -fsSL https://raw.githubusercontent.com/DaniFdz/ai-workflow/master/install.
 
 This will:
 - ✅ Verify Python 3.8+ is installed
+- ✅ Verify Node.js 20+ is installed
+- ✅ Install pi coding agent if not present
 - ✅ Create a virtual environment with dependencies
 - ✅ Install `minidani` command in your PATH
 - ✅ Make it available system-wide
@@ -155,8 +158,8 @@ minidani "Your task here"
 ### Verify Installation
 
 ```bash
-# Test OpenCode
-opencode --version
+# Test pi coding agent
+pi --version
 
 # Test MiniDani command
 minidani --help 2>/dev/null || echo "Run 'minidani' from any directory"
@@ -221,7 +224,7 @@ Round 1: A=45, B=50, C=40  ⚠️  Low quality detected
 Round 2: A=85, B=88, C=82  ✅ Winner: B (88/100)
 ```
 
-**Agent System:** MiniDani uses 6 specialized agents in `.opencode/agents/`:
+**Agent System:** MiniDani uses the pi coding agent via RPC mode for programmatic control. The agent prompts in `agents/` provide context:
 - `branch-namer.md` - Phase 1: Generate semantic branch names
 - `manager.md` - Phase 3: Coordinate full implementation (used by all 3 competing managers)
 - `red-team.md` - Implementation specialist (reference for manager)
@@ -229,7 +232,7 @@ Round 2: A=85, B=88, C=82  ✅ Winner: B (88/100)
 - `judge.md` - Phase 4: Evaluate and score implementations
 - `pr-creator.md` - Phase 6: Generate PR descriptions
 
-Each agent has detailed instructions, best practices, and evaluation criteria.
+Each agent prompt has detailed instructions, best practices, and evaluation criteria.
 
 [↑ Back to top](#table-of-contents)
 
@@ -594,10 +597,10 @@ self.QUALITY_THRESHOLD = 80  # Change to 70 or 90
 ```python
 # Manager execution timeout (default: 30 minutes per manager)
 # Formula: 20 min base + 10 min per iteration
-r = self.run_oc(..., timeout=1800)
+r = self.run_pi(..., timeout=1800)
 
 # Judge timeout (default: 8 minutes)
-r = self.run_oc(..., timeout=480)
+r = self.run_pi(..., timeout=480)
 ```
 
 [↑ Back to top](#table-of-contents)
@@ -606,16 +609,32 @@ r = self.run_oc(..., timeout=480)
 
 ## Troubleshooting
 
-### OpenCode not found
+### Pi coding agent not found
 
 ```bash
-# Check if OpenCode is installed
-opencode --version
+# Check if pi is installed
+pi --version
 
-# If not in PATH, find it
-which opencode
+# If not found, install it
+npm install -g @mariozechner/pi-coding-agent
 
-# Install from https://opencode.ai/docs
+# Verify Node.js version (requires 20+)
+node --version
+```
+
+### Node.js version too old
+
+```bash
+# Check current version
+node --version
+
+# Install Node.js 20+ (Ubuntu/Debian)
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Or use nvm
+nvm install 20
+nvm use 20
 ```
 
 ### Worktree conflicts
@@ -636,9 +655,9 @@ git branch -D feature/name-r1-a
 **Causes:**
 - Prompt too simple (judge expects more)
 - Prompt ambiguous (managers confused)
-- OpenCode having issues
+- Pi coding agent having issues
 
-**Solution:** MiniDani will auto-retry. If Round 2 also fails, check OpenCode logs.
+**Solution:** MiniDani will auto-retry. If Round 2 also fails, check pi agent logs.
 
 ### ModuleNotFoundError: No module named 'rich'
 
